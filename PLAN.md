@@ -137,7 +137,7 @@ pii-guardian/
 ## Configuration Format
 
 Config files use JSON with `Cpanel::JSON::XS` relaxed mode, which permits:
-- `// line comments` and `/* block comments */`
+- `# line comments` (shell-style, as supported by `Cpanel::JSON::XS` relaxed mode)
 - Trailing commas in objects and arrays
 - Unquoted keys that are valid identifiers
 - Single-quoted strings

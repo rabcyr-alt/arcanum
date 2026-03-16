@@ -1,0 +1,52 @@
+use strict;
+use warnings;
+use ExtUtils::MakeMaker;
+
+WriteMakefile(
+    NAME             => 'PII::Guardian',
+    AUTHOR           => 'pii-guardian contributors',
+    VERSION_FROM     => 'lib/PII/Guardian.pm',
+    ABSTRACT         => 'Discover, report, and remediate PII in filesystem paths',
+    MIN_PERL_VERSION => '5.020',
+    EXE_FILES        => ['bin/pii-guardian'],
+    PREREQ_PM        => {
+        'Cpanel::JSON::XS'       => '4.0',
+        'Path::Tiny'             => '0.100',
+        'File::MimeInfo'         => '0.28',
+        'Text::CSV_XS'           => '1.46',
+        'JSON::MaybeXS'          => 0,
+        'YAML::XS'               => '0.67',
+        'Net::LDAP::LDIF'        => 0,
+        'Spreadsheet::ParseExcel'=> 0,
+        'Spreadsheet::ParseXLSX' => 0,
+        'Spreadsheet::WriteExcel'=> 0,
+        'Excel::Writer::XLSX'    => 0,
+        'Data::ICal'             => 0,
+        'Email::MIME'            => 0,
+        'Email::Simple'          => 0,
+        'Mail::Box::Manager'     => 0,
+        'GnuPG::Interface'       => 0,
+        'Git::Repository'        => 0,
+        'HTTP::Tiny'             => 0,
+        'Digest::SHA'            => 0,
+        'Term::ANSIColor'        => 0,
+        'Getopt::Long'           => 0,
+        'Pod::Usage'             => 0,
+        'Try::Tiny'              => 0,
+        'Log::Any'               => 0,
+        'Image::ExifTool'        => 0,
+        'Scalar::Util'           => 0,
+        'List::Util'             => 0,
+        'Archive::Tar'           => 0,
+        'Archive::Zip'           => 0,
+        'Archive::Extract'       => 0,
+    },
+    META_MERGE => {
+        'meta-spec' => { version => 2 },
+        resources => {
+            repository => { type => 'git' },
+        },
+    },
+    dist  => { COMPRESS => 'gzip -9f', SUFFIX => 'gz' },
+    clean => { FILES => 'PII-Guardian-*' },
+);

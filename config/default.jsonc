@@ -1,0 +1,326 @@
+{
+  # ── Scan targets ──────────────────────────────────────────────────────────
+  scan: {
+    paths: [], # Required: list of absolute or relative paths to scan
+    exclude_globs: [ # Paths/globs to skip entirely
+      "**/node_modules/**",
+      "**/vendor/**",
+      "**/.git/**",
+      "**/cpan/**",
+      "**/local/lib/**",
+      "**/.cpan/**",
+      "**/.cpanm/**",
+      "**/venv/**",
+      "**/.venv/**",
+    ],
+    follow_symlinks: false,
+    max_depth: 0, # 0 = unlimited
+
+    # Age thresholds (in days) used for untracked file risk scoring
+    age_thresholds: {
+      relaxed:    365,
+      normal:     180,
+      aggressive:  90,
+    },
+
+    # Per-extension overrides for high-risk type treatment
+    # "presume_unsafe" means: default action is delete/encrypt, not redact
+    high_risk_extensions: [".ldif", ".ldi", ".bson"],
+
+    # CSV/TSV files are presumed unsafe only when PII-density scan agrees
+    csv_presume_unsafe_threshold: 0.3, # >30% of cells contain PII findings
+  },
+
+  # ── Allowlists ────────────────────────────────────────────────────────────
+  allowlist: {
+    # Exact email addresses that are acceptable to appear anywhere
+    emails: [],
+
+    # Email domain patterns (glob-style) acceptable in certain contexts
+    email_domains: [], # e.g. ["*@yourcompany.com", "*@trustedclient.com"]
+
+    # Person names (exact, case-insensitive) that are acceptable
+    names: [],
+
+    # Regex patterns (Perl regex syntax) whose full match is always allowed
+    patterns: [],
+
+    # Files or globs whose content is not scanned (but filename still checked)
+    file_globs: [],
+
+    # Author/contributor attribution patterns — matched lines are never findings
+    attribution_patterns: [
+      "^\\s*[#*]?\\s*(Author|Maintainer|Copyright|Written by|Contributor)\\s*[:\\-]",
+      "^=head\\d\\s+AUTHOR",
+      "@author\\b",
+      "^\\s*\"author\"\\s*:",
+    ],
+  },
+
+  # ── Global scanning level ─────────────────────────────────────────────────
+  # Values: "relaxed" | "normal" | "aggressive"
+  # Overridden per-detector below
+  default_level: "normal",
+
+  # ── Detectors ─────────────────────────────────────────────────────────────
+  detectors: {
+
+    email_address: {
+      enabled: true,
+      level: "normal",
+    },
+
+    phone_number: {
+      enabled: true,
+      level: "normal",
+      formats: ["E164", "NANP", "UK", "DE", "FR", "AU", "IN"],
+    },
+
+    ssn_us: {
+      enabled: true,
+      level: "aggressive",
+    },
+
+    nin_uk: {
+      enabled: false,
+    },
+
+    sin_canada: {
+      enabled: false,
+    },
+
+    tfn_australia: {
+      enabled: false,
+    },
+
+    credit_card: {
+      enabled: true,
+      level: "aggressive",
+      require_luhn: true,
+    },
+
+    iban: {
+      enabled: false,
+    },
+
+    ip_address: {
+      enabled: true,
+      level: "relaxed",
+      skip_private_ranges: true,
+    },
+
+    physical_address: {
+      enabled: true,
+      level: "relaxed",
+    },
+
+    date_of_birth: {
+      enabled: true,
+      level: "relaxed",
+      require_context: true,
+    },
+
+    name: {
+      enabled: true,
+      level: "normal",
+      strategy: "namelist",
+      min_score: 0.7,
+      plugin: "ner_spacy",
+    },
+
+    calendar_event: {
+      enabled: true,
+      level: "normal",
+    },
+
+    full_email_content: {
+      enabled: true,
+      level: "aggressive",
+    },
+
+    passport_number: {
+      enabled: true,
+      level: "normal",
+      countries: ["US", "UK", "CA", "AU", "DE", "FR"],
+    },
+
+    vin: {
+      enabled: false,
+    },
+
+    medical_id: {
+      enabled: false,
+    },
+
+    mac_address: {
+      enabled: true,
+      level: "relaxed",
+    },
+
+    national_id_generic: {
+      enabled: false,
+    },
+
+    secrets: {
+      enabled: false,
+      level: "aggressive",
+      scan_for: [
+        "private_key_pem",
+        "api_key_generic",
+        "oauth_token",
+        "jwt_token",
+        "aws_access_key",
+        "gcp_service_account",
+        "github_pat",
+        "slack_token",
+        "db_connection_string",
+      ],
+    },
+  },
+
+  # ── File-type risk classification ─────────────────────────────────────────
+  file_types: {
+    presume_unsafe: ["ldif", "ldi", "bson", "mongodump"],
+
+    images: {
+      scan_exif: true,
+      scan_filename: true,
+      ocr_enabled: false,
+    },
+
+    archives: {
+      max_expansion_ratio: 10,
+      max_extracted_bytes: 1073741824, # 1 GB
+      min_free_bytes: 524288000, # 500 MB
+      nested_max_depth: 5,
+      extensions: [
+        ".tar", ".tgz", ".tar.gz", ".tar.bz2", ".tar.xz", ".tar.zst",
+        ".zip", ".gz", ".bz2", ".xz", ".zst", ".7z", ".rar",
+      ],
+    },
+  },
+
+  # ── Remediation defaults ──────────────────────────────────────────────────
+  remediation: {
+    dry_run: true, # ALWAYS default to dry-run; require --execute to act
+
+    untracked_default_action: "quarantine",
+    tracked_default_action: "redact",
+
+    deletion: {
+      secure_overwrite: false,
+      secure_overwrite_for: ["ssn_us", "credit_card", "secrets"],
+      shred_command: "shred -uz",
+    },
+
+    redaction: {
+      strategy: "mask",
+      masks: {
+        email_address:    "[REDACTED-EMAIL]",
+        phone_number:     "[REDACTED-PHONE]",
+        ssn_us:           "[REDACTED-SSN]",
+        credit_card:      "[REDACTED-CC]",
+        name:             "[REDACTED-NAME]",
+        physical_address: "[REDACTED-ADDRESS]",
+        date_of_birth:    "[REDACTED-DOB]",
+        default:          "[REDACTED]",
+      },
+      pseudonym_key_file: null,
+    },
+
+    quarantine_dir: ".pii-guardian-quarantine",
+
+    encryption: {
+      gpg_key_id: null,
+      keep_encrypted: true,
+      encrypted_extension: ".gpg",
+    },
+
+    ignore_file: ".pii-guardian-ignore",
+
+    # Crash recovery: if true, preserve temp dirs on crash for resume
+    preserve_on_crash: false,
+
+    # Corrupt file handling: "plaintext" | "skip" | "error"
+    corrupt_file_action: "plaintext",
+  },
+
+  # ── Git integration ───────────────────────────────────────────────────────
+  git: {
+    rewrite_tool: "filter-repo",
+    auto_detect_repos: true,
+    generate_commands: true,
+    notification_backends: [],
+  },
+
+  # ── Notification backends ─────────────────────────────────────────────────
+  notifications: {
+
+    email: {
+      enabled: false,
+      smtp_host: null,
+      smtp_port: 587,
+      smtp_tls: true,
+      from: null,
+      to: [],
+      smtp_password_env: "PII_GUARDIAN_SMTP_PASSWORD",
+    },
+
+    bitbucket_cloud: {
+      enabled: false,
+      workspace: null,
+      repo_slug: null,
+      api_token_env: "PII_GUARDIAN_BITBUCKET_TOKEN",
+      action: "comment",
+    },
+
+    bitbucket_server: {
+      enabled: false,
+      base_url: null,
+      project_key: null,
+      repo_slug: null,
+      api_token_env: "PII_GUARDIAN_BITBUCKET_TOKEN",
+      action: "comment",
+    },
+
+    github: {
+      enabled: false,
+      owner: null,
+      repo: null,
+      api_token_env: "PII_GUARDIAN_GITHUB_TOKEN",
+      action: "issue",
+    },
+
+    gitlab: {
+      enabled: false,
+      project_id: null,
+      base_url: "https://gitlab.com",
+      api_token_env: "PII_GUARDIAN_GITLAB_TOKEN",
+      action: "issue",
+    },
+
+    webhook: {
+      enabled: false,
+      url: null,
+      method: "POST",
+      headers: {},
+      payload_template: null,
+    },
+  },
+
+  # ── Reporting ─────────────────────────────────────────────────────────────
+  report: {
+    formats: ["text"],
+    output_dir: null,
+    compliance_frameworks: [],
+    include_retention_recommendations: true,
+    tombstone_file: ".pii-guardian-tombstones",
+  },
+
+  # ── Scheduling (generates cron/systemd output; does not install) ──────────
+  schedule: {
+    generate_cron: false,
+    cron_expression: "0 2 * * 0",
+    generate_systemd: false,
+  },
+}

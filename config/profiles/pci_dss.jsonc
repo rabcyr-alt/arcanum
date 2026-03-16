@@ -1,0 +1,18 @@
+{
+  # PCI-DSS profile — aggressive on card data
+  default_level: "normal",
+  detectors: {
+    credit_card: { enabled: true, level: "aggressive", require_luhn: true },
+    ssn_us:      { enabled: true, level: "aggressive" },
+    secrets:     { enabled: true, level: "aggressive" },
+  },
+  remediation: {
+    deletion: {
+      secure_overwrite: true,
+      secure_overwrite_for: ["credit_card", "ssn_us", "secrets"],
+    },
+  },
+  report: {
+    compliance_frameworks: ["pci_dss"],
+  },
+}

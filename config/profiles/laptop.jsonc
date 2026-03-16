@@ -1,0 +1,25 @@
+{
+  # Laptop scan preset — adds home dir artefacts, history files, screenshots
+  default_level: "normal",
+  scan: {
+    age_thresholds: {
+      relaxed:    365,
+      normal:     180,
+      aggressive:  90,
+    },
+  },
+  detectors: {
+    email_address:    { enabled: true, level: "normal" },
+    phone_number:     { enabled: true, level: "normal" },
+    name:             { enabled: true, level: "normal" },
+    physical_address: { enabled: true, level: "relaxed" },
+    date_of_birth:    { enabled: true, level: "relaxed" },
+    secrets:          { enabled: true, level: "aggressive" },
+  },
+  file_types: {
+    images: {
+      scan_exif: true,
+      scan_filename: true,
+    },
+  },
+}

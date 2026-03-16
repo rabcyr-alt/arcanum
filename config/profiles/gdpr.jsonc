@@ -1,0 +1,39 @@
+{
+  # GDPR-focused profile
+  # Enables all personal data detectors; aggressive on high-risk types;
+  # short retention thresholds; secure deletion enabled.
+  default_level: "normal",
+  scan: {
+    age_thresholds: {
+      relaxed:    180,
+      normal:      90,
+      aggressive:  30,
+    },
+  },
+  detectors: {
+    email_address:    { enabled: true,  level: "normal" },
+    phone_number:     { enabled: true,  level: "normal" },
+    ssn_us:           { enabled: true,  level: "aggressive" },
+    nin_uk:           { enabled: true,  level: "aggressive" },
+    sin_canada:       { enabled: true,  level: "aggressive" },
+    tfn_australia:    { enabled: true,  level: "aggressive" },
+    credit_card:      { enabled: true,  level: "aggressive" },
+    iban:             { enabled: true,  level: "normal" },
+    ip_address:       { enabled: true,  level: "relaxed" },
+    physical_address: { enabled: true,  level: "normal" },
+    date_of_birth:    { enabled: true,  level: "normal", require_context: false },
+    name:             { enabled: true,  level: "normal" },
+    passport_number:  { enabled: true,  level: "aggressive" },
+    medical_id:       { enabled: true,  level: "aggressive" },
+    full_email_content: { enabled: true, level: "aggressive" },
+  },
+  remediation: {
+    deletion: {
+      secure_overwrite: true,
+      secure_overwrite_for: ["ssn_us", "credit_card", "secrets", "nin_uk", "sin_canada", "medical_id", "passport_number"],
+    },
+  },
+  report: {
+    compliance_frameworks: ["gdpr"],
+  },
+}

@@ -1,0 +1,22 @@
+{
+  # HIPAA profile — health data and PHI
+  default_level: "normal",
+  detectors: {
+    medical_id:       { enabled: true, level: "aggressive" },
+    ssn_us:           { enabled: true, level: "aggressive" },
+    date_of_birth:    { enabled: true, level: "normal", require_context: false },
+    name:             { enabled: true, level: "normal" },
+    physical_address: { enabled: true, level: "normal" },
+    phone_number:     { enabled: true, level: "normal" },
+    email_address:    { enabled: true, level: "normal" },
+  },
+  remediation: {
+    deletion: {
+      secure_overwrite: true,
+      secure_overwrite_for: ["medical_id", "ssn_us", "credit_card", "secrets"],
+    },
+  },
+  report: {
+    compliance_frameworks: ["hipaa"],
+  },
+}

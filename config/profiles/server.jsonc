@@ -1,0 +1,29 @@
+{
+  # Typical Linux server scan preset
+  # Skips home-dir artefacts; focuses on data exports, configs, logs
+  default_level: "normal",
+  scan: {
+    exclude_globs: [
+      "**/node_modules/**",
+      "**/vendor/**",
+      "**/.git/**",
+      "**/cpan/**",
+      "**/local/lib/**",
+      "**/.cpan/**",
+      "**/.cpanm/**",
+      "**/venv/**",
+      "**/.venv/**",
+      "**/proc/**",
+      "**/sys/**",
+      "**/dev/**",
+      "**/run/**",
+    ],
+  },
+  detectors: {
+    secrets: { enabled: true, level: "aggressive" },
+    ip_address: { enabled: true, level: "relaxed", skip_private_ranges: true },
+  },
+  report: {
+    compliance_frameworks: [],
+  },
+}

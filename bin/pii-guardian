@@ -1,0 +1,240 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use utf8;
+
+use FindBin qw($RealBin);
+use lib "$RealBin/../lib";
+
+# Ensure UTF-8 output on all standard filehandles
+binmode STDOUT, ':encoding(UTF-8)';
+binmode STDERR, ':encoding(UTF-8)';
+
+use Getopt::Long qw(:config no_ignore_case bundling pass_through);
+use Pod::Usage   qw(pod2usage);
+
+use PII::Guardian;
+
+our $VERSION = '0.01';
+
+# ── Parse global options ──────────────────────────────────────────────────────
+
+my %opt = (
+    verbosity => 0,
+    color     => undef,  # undef = auto-detect
+    dry_run   => 1,
+);
+
+GetOptions(
+    'config|c=s'        => \$opt{config_file},
+    'profile|p=s'       => \$opt{profile},
+    'level|l=s'         => \$opt{level},
+    'dry-run'           => sub { $opt{dry_run} = 1 },
+    'execute'           => sub { $opt{dry_run} = 0 },
+    'verbose|v+'        => \$opt{verbosity},
+    'quiet|q'           => \$opt{quiet},
+    'color!'            => \$opt{color},   # --color / --no-color
+    'report-format|f=s' => \$opt{report_format},
+    'report-dir=s'      => \$opt{report_dir},
+    'help|h'            => \$opt{help},
+    'version|V'         => \$opt{version},
+) or pod2usage(2);
+
+if ($opt{version}) {
+    print "pii-guardian $VERSION\n";
+    exit 0;
+}
+
+# ── Determine subcommand ──────────────────────────────────────────────────────
+
+my $subcommand = shift @ARGV // '';
+
+if (!$subcommand || $opt{help}) {
+    pod2usage( -exitval => ($opt{help} ? 0 : 1), -verbose => 1 );
+}
+
+# Sub-command dispatch
+my %dispatch = (
+    scan      => \&cmd_scan,
+    report    => \&cmd_report,
+    full      => \&cmd_full,
+    config    => \&cmd_config,
+    help      => sub { pod2usage(-exitval => 0, -verbose => 2) },
+);
+
+my $handler = $dispatch{$subcommand}
+    or die "Unknown subcommand '$subcommand'. Run 'pii-guardian help' for usage.\n";
+
+# Build Guardian instance
+my %guardian_args = (
+    config_file => $opt{config_file},
+    profile     => $opt{profile},
+    verbosity   => $opt{verbosity},
+    quiet       => $opt{quiet},
+    color       => $opt{color},
+    overrides   => _build_overrides(\%opt),
+);
+
+my $guardian = PII::Guardian->new(%guardian_args);
+
+$handler->($guardian, \%opt, \@ARGV);
+
+exit 0;
+
+# ── Subcommand implementations ────────────────────────────────────────────────
+
+sub cmd_scan {
+    my ($g, $opt, $args) = @_;
+
+    my @paths = @$args;
+    my $results = $g->run_scan(\@paths);
+
+    # Store results for a potential separate 'report' call (MVP: in memory)
+    # For now, print a minimal summary
+    printf "Scan complete: %d file(s) examined, %d finding(s).\n",
+        $results->{files_examined} // 0,
+        scalar map { @{ $_->{findings} // [] } } @{ $results->{file_results} // [] };
+}
+
+sub cmd_report {
+    my ($g, $opt, $args) = @_;
+
+    die "The 'report' subcommand requires a prior scan result. Use 'full' to scan and report in one step.\n";
+}
+
+sub cmd_full {
+    my ($g, $opt, $args) = @_;
+
+    my @paths = @$args;
+
+    my $results = $g->run_scan(\@paths);
+
+    my $fmt = $opt->{report_format} // 'text';
+    $g->run_report($results, format => $fmt);
+}
+
+sub cmd_config {
+    my ($g, $opt, $args) = @_;
+
+    my $subcmd = shift(@$args) // '';
+
+    if ($subcmd eq '--check' || $subcmd eq 'check') {
+        exit( $g->config_check ? 0 : 1 );
+    }
+    elsif ($subcmd eq '--dump' || $subcmd eq 'dump') {
+        $g->config_dump;
+    }
+    else {
+        die "Usage: pii-guardian config --check | --dump\n";
+    }
+}
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+# Build config overrides from CLI flags.
+sub _build_overrides {
+    my ($opt) = @_;
+    my %ov;
+
+    $ov{default_level} = $opt->{level}
+        if defined $opt->{level};
+
+    $ov{remediation}{dry_run} = $opt->{dry_run}
+        if defined $opt->{dry_run};
+
+    if (defined $opt->{report_format}) {
+        $ov{report}{formats} = [ $opt->{report_format} ];
+    }
+    if (defined $opt->{report_dir}) {
+        $ov{report}{output_dir} = $opt->{report_dir};
+    }
+
+    return \%ov;
+}
+
+__END__
+
+=head1 NAME
+
+pii-guardian - Discover, report, and remediate PII in filesystem paths
+
+=head1 SYNOPSIS
+
+  pii-guardian scan     [options] <path> [<path> ...]
+  pii-guardian report   [options]
+  pii-guardian full     [options] <path> [<path> ...]
+  pii-guardian config   --check
+  pii-guardian config   --dump
+  pii-guardian help     [<command>]
+
+=head1 GLOBAL OPTIONS
+
+  --config <file>          Path to config file (JSONC relaxed format)
+  --profile <name>         Named profile preset: gdpr, pci_dss, hipaa, server, laptop
+  --level <level>          Override global scanning level: relaxed|normal|aggressive
+  --dry-run                Do not modify any files (default for remediate)
+  --execute                Allow remediation to make changes (must be explicit)
+  -v, --verbose            Increase log verbosity (repeatable: -v -vv)
+  -q, --quiet              Suppress all output except errors
+  --color / --no-color     Enable or disable ANSI colour output
+  --report-format <fmt>    Report format: text (json and html coming soon)
+  --report-dir <dir>       Directory to write report files
+  -h, --help               Show this help
+  -V, --version            Show version
+
+=head1 SUBCOMMANDS
+
+=head2 scan
+
+Walk the given paths and detect PII. Prints a brief summary.
+
+  pii-guardian scan /home/user/exports /home/user/projects
+
+=head2 full
+
+Scan and immediately produce a report (most common usage).
+
+  pii-guardian full /home/user/exports
+  pii-guardian full --profile gdpr --level aggressive /data
+
+=head2 config --check
+
+Validate the configuration file without running a scan.
+
+=head2 config --dump
+
+Print the fully merged effective configuration as pretty JSON.
+
+=head1 EXAMPLES
+
+  # Quick scan of a directory
+  pii-guardian full /var/exports
+
+  # GDPR-focused aggressive scan with verbose output
+  pii-guardian full --profile gdpr --level aggressive -v /home/user
+
+  # Validate your config file
+  pii-guardian config --check
+
+  # Show effective config (merging defaults, user config, and profile)
+  pii-guardian config --dump --profile gdpr
+
+=head1 CONFIGURATION
+
+Config files use JSON with relaxed parsing (comments, trailing commas, unquoted keys).
+
+Search order:
+  1. --config <file>
+  2. .pii-guardian.jsonc in current directory
+  3. ~/.config/pii-guardian/config.jsonc
+  4. /etc/pii-guardian/config.jsonc
+  5. Built-in defaults
+
+=head1 AUTHOR
+
+pii-guardian contributors
+
+=head1 LICENSE
+
+Same as Perl itself.
