@@ -1,0 +1,7 @@
+*~
+/.build/
+!/.gitignore
+/.latest
+/ignore/
+/PII-Guardian-*/
+/PII-Guardian-*.tar.gz
