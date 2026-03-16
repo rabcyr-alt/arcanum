@@ -90,17 +90,14 @@ sub cmd_scan {
     my @paths = @$args;
     my $results = $g->run_scan(\@paths);
 
-    # Store results for a potential separate 'report' call (MVP: in memory)
-    # For now, print a minimal summary
-    printf "Scan complete: %d file(s) examined, %d finding(s).\n",
-        $results->{files_examined} // 0,
-        scalar map { @{ $_->{findings} // [] } } @{ $results->{file_results} // [] };
+    my $fmt = $opt->{report_format} // 'text';
+    $g->run_report($results, format => $fmt);
 }
 
 sub cmd_report {
     my ($g, $opt, $args) = @_;
 
-    die "The 'report' subcommand requires a prior scan result. Use 'full' to scan and report in one step.\n";
+    die "The 'report' subcommand requires a prior scan result. Use 'scan' or 'full' to scan and report in one step.\n";
 }
 
 sub cmd_full {
@@ -187,7 +184,8 @@ pii-guardian - Discover, report, and remediate PII in filesystem paths
 
 =head2 scan
 
-Walk the given paths and detect PII. Prints a brief summary.
+Walk the given paths and detect PII, then print the full report.
+Equivalent to C<full> — both subcommands scan and immediately report.
 
   pii-guardian scan /home/user/exports /home/user/projects
 
