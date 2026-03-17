@@ -9,6 +9,18 @@ back-ends are configured and explicitly enabled.
 
 ---
 
+## WARNING
+
+THIS CODE IS FAR FROM PRODUCTION-READY! DO NOT RUN ON ANY PRODUCTION SYSTEM! Purely AI-generated code. It leaves a mess of temp files (very bad considering its purpose) on scanning, and its remediation actions might not work, or it might ruin things.
+
+Once I have it working for me, it still may not work properly for every format nor every detector. Every remediator should work, however. Notification may not, or only email.
+
+I gave Claude examples of what I wanted, and told it to fill in the gaps. As such, it's ambitious and possibly comprensive, but who knows. I do not deal with compliance, legal, etc. This was created to be proactive on cleaning up archived content I have.
+
+-Ashley
+
+---
+
 ## Features
 
 - **Scan** directories recursively, including inside `.tar.gz`, `.zip`, and
