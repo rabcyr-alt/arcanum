@@ -31,6 +31,7 @@ use PII::Detector::PhysicalAddress;
 use PII::Detector::CalendarEvent;
 use PII::Detector::FullEmail;
 use PII::Detector::Secrets;
+use PII::Detector::Plugin;
 use PII::Format::PlainText;
 use PII::Format::CSV;
 use PII::Format::JSON;
@@ -103,11 +104,16 @@ sub new {
     );
 
     my $self = {
-        log       => $log,
-        cfg_obj   => $cfg_obj,
-        _cfg      => undef,   # loaded lazily via _cfg()
-        cli_paths => $args{paths} // [],
-        color     => $args{color} // (-t STDOUT ? 1 : 0),
+        log        => $log,
+        cfg_obj    => $cfg_obj,
+        _cfg       => undef,   # loaded lazily via _cfg()
+        cli_paths  => $args{paths} // [],
+        color      => $args{color} // (-t STDOUT ? 1 : 0),
+        config_dir => do {
+            my $cf = $args{config_file} // '';
+            $cf =~ s{/[^/]+$}{} if $cf;
+            $cf || '.';
+        },
     };
 
     return bless $self, $class;
@@ -302,7 +308,51 @@ sub _build_detectors {
         my $det = $class->new(config => $cfg, logger => $self->{log});
         push @detectors, $det if $det->is_enabled;
     }
+
+    # Append any plugin detectors declared in config
+    push @detectors, $self->_build_plugin_detectors($cfg);
+
     return @detectors;
+}
+
+# Instantiate PII::Detector::Plugin for each entry in config.plugins[]
+# and for any detectors config block with strategy=>"plugin".
+sub _build_plugin_detectors {
+    my ($self, $cfg) = @_;
+
+    my @plugins;
+
+    # Top-level plugins array: [ { name=>'ner_spacy', enabled=>1, ... }, ... ]
+    for my $pcfg (@{ $cfg->{plugins} // [] }) {
+        next unless ref $pcfg eq 'HASH';
+        my $name = $pcfg->{name} or next;
+        my $det  = PII::Detector::Plugin->new(
+            config      => $cfg,
+            logger      => $self->{log},
+            plugin_name => $name,
+            plugin_cfg  => $pcfg,
+            config_dir  => $self->{config_dir},
+        );
+        push @plugins, $det if $det->is_enabled;
+    }
+
+    # detectors.<name>.strategy = "plugin" style
+    for my $dtype (sort keys %{ $cfg->{detectors} // {} }) {
+        my $dcfg = $cfg->{detectors}{$dtype};
+        next unless ref $dcfg eq 'HASH';
+        next unless ($dcfg->{strategy} // '') eq 'plugin';
+        my $pname = $dcfg->{plugin} // $dtype;
+        my $det = PII::Detector::Plugin->new(
+            config      => $cfg,
+            logger      => $self->{log},
+            plugin_name => $pname,
+            plugin_cfg  => $dcfg,
+            config_dir  => $self->{config_dir},
+        );
+        push @plugins, $det if $det->is_enabled;
+    }
+
+    return @plugins;
 }
 
 # Build format parser instances (in priority order).
