@@ -1,0 +1,19 @@
+# Build artifacts
+^PII-Guardian-\d
+^Makefile$
+^MYMETA\.(yml|json)$
+^blib/
+^pm_to_blib
+
+# Version control and IDE
+^\.git/
+^\.claude/
+^\.gitignore$
+
+# Internal planning / scratch
+^PLAN\.md$
+^ignore/
+
+# Temporary / editor
+\.swp$
+~$

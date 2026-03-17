@@ -88,4 +88,4 @@ Revision history for pii-guardian
       - --execute flag required for any file modification
       - --profile, --level, --dry-run, --verbose, --quiet, --no-color
 
-    Test suite: 853 tests across 24 test files (prove -l t/ → PASS)
+    Test suite: 1049 tests across 27 test files (prove -l t/ → PASS)

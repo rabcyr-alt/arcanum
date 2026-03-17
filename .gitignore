@@ -5,3 +5,9 @@
 /ignore/
 /PII-Guardian-*/
 /PII-Guardian-*.tar.gz
+/Makefile
+/MYMETA.yml
+/MYMETA.json
+/MANIFEST.bak
+/blib/
+/pm_to_blib
