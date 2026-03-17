@@ -1,4 +1,4 @@
-# pii-guardian — CPAN dependencies
+# arcanum — CPAN dependencies
 #
 # Installation preference:
 #   1. Use your system package manager (yum, dnf, apt) when a perl-* package is available.

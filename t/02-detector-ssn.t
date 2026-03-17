@@ -2,9 +2,9 @@
 use strict; use warnings;
 use FindBin qw($RealBin); use lib "$RealBin/../lib";
 use Test::More;
-use PII::Detector::SSN;
+use App::Arcanum::Detector::SSN;
 
-sub mk { PII::Detector::SSN->new(config => {
+sub mk { App::Arcanum::Detector::SSN->new(config => {
     default_level => $_[0] // 'normal',
     detectors => { ssn_us => { enabled => 1, level => $_[0] // 'normal' } },
     allowlist => { attribution_patterns => [] },
@@ -51,7 +51,7 @@ sub mk { PII::Detector::SSN->new(config => {
   is($f[0]{value}, '078-05-1120', 'normalised to dashed form'); }
 
 # Disabled
-{ my $d = PII::Detector::SSN->new(config => {
+{ my $d = App::Arcanum::Detector::SSN->new(config => {
       default_level => 'normal',
       detectors => { ssn_us => { enabled => 0 } },
       allowlist => { attribution_patterns => [] },

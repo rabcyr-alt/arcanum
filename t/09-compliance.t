@@ -3,7 +3,7 @@ use strict; use warnings;
 use FindBin qw($RealBin); use lib "$RealBin/../lib";
 use Test::More;
 
-use PII::Report::ComplianceMap;
+use App::Arcanum::Report::ComplianceMap;
 
 # ── Shared fixture ────────────────────────────────────────────────────────────
 
@@ -69,7 +69,7 @@ sub sample_scan {
 
 # ── Constructor ───────────────────────────────────────────────────────────────
 
-my $cm = PII::Report::ComplianceMap->new(config => {});
+my $cm = App::Arcanum::Report::ComplianceMap->new(config => {});
 ok(defined $cm, 'ComplianceMap object created');
 
 # ── map() structure ───────────────────────────────────────────────────────────
@@ -160,16 +160,16 @@ ok((grep { /Financial/ || /Contact/ || /Identity/ } @{ $csv_ropa->{data_categori
 
 # ── framework_tags_for ───────────────────────────────────────────────────────
 
-my @cc_tags = PII::Report::ComplianceMap->framework_tags_for('credit_card');
+my @cc_tags = App::Arcanum::Report::ComplianceMap->framework_tags_for('credit_card');
 ok((grep { $_ eq 'pci_dss' } @cc_tags), 'credit_card → pci_dss tag');
 ok(!(grep { $_ eq 'gdpr' } @cc_tags),   'credit_card does not map to gdpr');
 
-my @email_tags = PII::Report::ComplianceMap->framework_tags_for('email_address');
+my @email_tags = App::Arcanum::Report::ComplianceMap->framework_tags_for('email_address');
 ok((grep { $_ eq 'gdpr' } @email_tags), 'email_address → gdpr');
 ok((grep { $_ eq 'ccpa' } @email_tags), 'email_address → ccpa');
 ok((grep { $_ eq 'hipaa'} @email_tags), 'email_address → hipaa');
 
-my @unknown_tags = PII::Report::ComplianceMap->framework_tags_for('unknown_type_xyz');
+my @unknown_tags = App::Arcanum::Report::ComplianceMap->framework_tags_for('unknown_type_xyz');
 is(scalar @unknown_tags, 0, 'unknown type returns empty tag list');
 
 # ── DSR: data_subject_request ─────────────────────────────────────────────────

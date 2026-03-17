@@ -1,4 +1,4 @@
-# pii-guardian Plugin System
+# arcanum Plugin System
 
 Plugins are executables (any language) invoked as subprocesses. Communication
 is JSON over stdin/stdout.
@@ -53,5 +53,5 @@ detectors: {
 ## Plugin Search Path
 
 1. `plugins/` relative to the config file
-2. `~/.config/pii-guardian/plugins/`
+2. `~/.config/arcanum/plugins/`
 3. Directories in `$PATH`

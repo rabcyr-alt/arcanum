@@ -5,9 +5,9 @@ use Test::More;
 use File::Temp qw(tempdir tempfile);
 use File::Path qw(make_path);
 
-use PII::SpecialFiles;
-use PII::Detector::CommandLinePII;
-use PII::Detector::Email;
+use App::Arcanum::SpecialFiles;
+use App::Arcanum::Detector::CommandLinePII;
+use App::Arcanum::Detector::Email;
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -21,7 +21,7 @@ sub make_file {
 }
 
 my $tmpdir = tempdir(CLEANUP => 1);
-my $sf     = PII::SpecialFiles->new(config => {});
+my $sf     = App::Arcanum::SpecialFiles->new(config => {});
 
 # ── classify(): shell history ─────────────────────────────────────────────────
 
@@ -87,9 +87,9 @@ ok($sf->is_credential_file('/app/.env'),                'is_credential_file');
 ok($sf->is_image('/photos/selfie.jpg'),                 'is_image');
 ok(!$sf->is_shell_history('/home/user/README.md'),     '!is_shell_history');
 
-# ── PII::Detector::CommandLinePII ─────────────────────────────────────────────
+# ── App::Arcanum::Detector::CommandLinePII ─────────────────────────────────────────────
 
-my $cli_det = PII::Detector::CommandLinePII->new(config => {});
+my $cli_det = App::Arcanum::Detector::CommandLinePII->new(config => {});
 ok(defined $cli_det,                   'CommandLinePII created');
 is($cli_det->detector_type, 'command_line_pii', 'detector_type');
 ok($cli_det->is_enabled,               'enabled by default');
@@ -194,7 +194,7 @@ PGPASSWORD=dbpass123 psql -U admin production
 HIST
 
     my $fi = { path => $hist_path, git_status => 'outside_repo', age_days => 100 };
-    my @dets = (PII::Detector::Email->new(config => {}));
+    my @dets = (App::Arcanum::Detector::Email->new(config => {}));
 
     my $result = $sf->scan($fi, \@dets);
     ok(defined $result,                         'scan() returns result for .bash_history');
@@ -219,7 +219,7 @@ Bob Jones,bob@test.org
 BAK
 
     my $fi = { path => $swp_path, git_status => 'untracked', age_days => 5 };
-    my $email_det = PII::Detector::Email->new(config => {});
+    my $email_det = App::Arcanum::Detector::Email->new(config => {});
     my $result = $sf->scan($fi, [$email_det]);
 
     ok(defined $result,                              'scan .bak returns result');
@@ -240,7 +240,7 @@ MAIL_FROM=noreply@example.com
 ENV
 
     my $fi = { path => $env_path, git_status => 'untracked', age_days => 10 };
-    my @dets = (PII::Detector::Email->new(config => {}));
+    my @dets = (App::Arcanum::Detector::Email->new(config => {}));
     my $result = $sf->scan($fi, \@dets);
 
     ok(defined $result,                              'scan .env returns result');
@@ -371,8 +371,8 @@ my $VALID_JPEG = pack('C*',
 # ── Guardian integration: _build_detectors includes CommandLinePII ────────────
 
 {
-    require PII::Guardian;
-    my $g = PII::Guardian->new(paths => [], overrides => {});
+    require App::Arcanum;
+    my $g = App::Arcanum->new(paths => [], overrides => {});
     my $cfg = { detectors => { command_line_pii => { enabled => 1 } } };
     my @dets = $g->_build_detectors($cfg);
     my @cli_dets = grep { $_->detector_type eq 'command_line_pii' } @dets;

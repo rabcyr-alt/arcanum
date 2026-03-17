@@ -7,14 +7,14 @@ use File::Path qw(make_path);
 use Digest::SHA qw(sha256_hex);
 use Cpanel::JSON::XS ();
 
-use PII::Guardian;
-use PII::Report::JSON;
-use PII::Report::HTML;
-use PII::Report::ComplianceMap;
-use PII::Remediation::Redactor;
-use PII::Remediation::Quarantine;
-use PII::Remediation::Deleter;
-use PII::Tombstone;
+use App::Arcanum;
+use App::Arcanum::Report::JSON;
+use App::Arcanum::Report::HTML;
+use App::Arcanum::Report::ComplianceMap;
+use App::Arcanum::Remediation::Redactor;
+use App::Arcanum::Remediation::Quarantine;
+use App::Arcanum::Remediation::Deleter;
+use App::Arcanum::Tombstone;
 
 my $JSON   = Cpanel::JSON::XS->new->utf8->relaxed;
 my $tmpdir = tempdir(CLEANUP => 1);
@@ -39,7 +39,7 @@ sub slurp {
 # where needed.  Paths are also supplied directly to run_scan() in each test.
 sub make_guardian {
     my ($scan_dir, %over) = @_;
-    return PII::Guardian->new(
+    return App::Arcanum->new(
         overrides => {
             scan          => { paths => [$scan_dir], max_depth => 0, min_age_days => 0 },
             remediation   => { dry_run => 1 },
@@ -306,7 +306,7 @@ write_file("$scan8/other.txt",
     "Contact: bob\@example.org\n");
 
 {
-    my $g = PII::Guardian->new(
+    my $g = App::Arcanum->new(
         overrides => {
             scan      => { paths => [$scan8], max_depth => 0, min_age_days => 0 },
             remediation => { dry_run => 1 },
@@ -327,7 +327,7 @@ write_file("$scan8/other.txt",
 
 {
     my $sr      = fake_scan_results($tmpdir);
-    my $rpt     = PII::Report::JSON->new(config => {}, logger => undef);
+    my $rpt     = App::Arcanum::Report::JSON->new(config => {}, logger => undef);
     my $json_str = $rpt->render($sr);
 
     ok(defined $json_str && length $json_str > 0, 'JSON report: non-empty');
@@ -348,7 +348,7 @@ write_file("$scan8/other.txt",
 
 {
     my $sr  = fake_scan_results($tmpdir);
-    my $rpt = PII::Report::JSON->new(config => {}, logger => undef);
+    my $rpt = App::Arcanum::Report::JSON->new(config => {}, logger => undef);
     my $doc = Cpanel::JSON::XS->new->utf8->decode($rpt->render($sr));
 
     my @crit;
@@ -370,7 +370,7 @@ write_file("$scan8/other.txt",
 
 {
     my $sr      = fake_scan_results($tmpdir);
-    my $rpt     = PII::Report::JSON->new(config => {}, logger => undef);
+    my $rpt     = App::Arcanum::Report::JSON->new(config => {}, logger => undef);
     my $outfile = "$tmpdir/report.json";
     my $written = $rpt->write($sr, $outfile);
 
@@ -386,13 +386,13 @@ write_file("$scan8/other.txt",
 
 {
     my $sr  = fake_scan_results($tmpdir);
-    my $rpt = PII::Report::HTML->new(config => {}, logger => undef);
+    my $rpt = App::Arcanum::Report::HTML->new(config => {}, logger => undef);
     my $html = $rpt->render($sr);
 
     ok(defined $html && length $html > 0,  'HTML report: non-empty');
     like($html, qr/<!DOCTYPE html>/i,      'HTML report: has DOCTYPE');
     like($html, qr/<html/i,               'HTML report: has <html>');
-    like($html, qr/pii.guardian/i,         'HTML report: mentions pii-guardian');
+    like($html, qr/arcanum/i,         'HTML report: mentions arcanum');
     like($html, qr/total.findings/i,       'HTML report: mentions total findings');
     like($html, qr/critical/i,             'HTML report: mentions severity critical');
     like($html, qr/Remediation Plan/i,     'HTML report: remediation plan section');
@@ -415,7 +415,7 @@ write_file("$scan8/other.txt",
 
 {
     my $sr      = fake_scan_results($tmpdir);
-    my $rpt     = PII::Report::HTML->new(config => {}, logger => undef);
+    my $rpt     = App::Arcanum::Report::HTML->new(config => {}, logger => undef);
     my $outfile = "$tmpdir/report.html";
     my $written = $rpt->write($sr, $outfile);
 
@@ -429,7 +429,7 @@ write_file("$scan8/other.txt",
 
 {
     my $sr  = fake_scan_results($tmpdir);
-    my $cm  = PII::Report::ComplianceMap->new(config => {}, logger => undef);
+    my $cm  = App::Arcanum::Report::ComplianceMap->new(config => {}, logger => undef);
     my $map = $cm->map($sr);
 
     ok(defined $map,                         'ComplianceMap: map returned');
@@ -444,7 +444,7 @@ write_file("$scan8/other.txt",
 
 {
     my $sr  = fake_scan_results($tmpdir);
-    my $cm  = PII::Report::ComplianceMap->new(config => {}, logger => undef);
+    my $cm  = App::Arcanum::Report::ComplianceMap->new(config => {}, logger => undef);
 
     my $output = '';
     open my $fh, '>:utf8', \$output;
@@ -457,7 +457,7 @@ write_file("$scan8/other.txt",
 
 {
     my $sr = fake_scan_results($tmpdir);
-    my $cm = PII::Report::ComplianceMap->new(config => {}, logger => undef);
+    my $cm = App::Arcanum::Report::ComplianceMap->new(config => {}, logger => undef);
 
     # Returns a hashref: { identity=>'...', files=>[], file_count=>N, finding_count=>N }
     my $hit  = $cm->data_subject_request($sr, 'alice@example.com');
@@ -477,7 +477,7 @@ write_file("$scan8/other.txt",
     my $file = write_file("$rdir/data.csv",
         "name,email,card\nAlice,alice\@example.com,4111111111111111\n");
 
-    my $redactor = PII::Remediation::Redactor->new(
+    my $redactor = App::Arcanum::Remediation::Redactor->new(
         config    => { remediation => { dry_run => 1 } },
         scan_root => $rdir,
     );
@@ -503,7 +503,7 @@ write_file("$scan8/other.txt",
     my $file = write_file("$rdir/data.csv",
         "name,email,notes\nAlice,alice\@example.com,VIP\n");
 
-    my $redactor = PII::Remediation::Redactor->new(
+    my $redactor = App::Arcanum::Remediation::Redactor->new(
         config    => { remediation => { dry_run => 0 } },
         scan_root => $rdir,
     );
@@ -536,7 +536,7 @@ write_file("$scan8/other.txt",
     my $file = write_file("$qdir/sensitive.csv",
         "name,ssn\nAlice,078-05-1120\n");
 
-    my $q = PII::Remediation::Quarantine->new(
+    my $q = App::Arcanum::Remediation::Quarantine->new(
         config    => { remediation => { dry_run => 1 } },
         scan_root => $qdir,
     );
@@ -554,7 +554,7 @@ write_file("$scan8/other.txt",
     my $file = write_file("$qdir/sensitive.csv",
         "name,ssn\nBob,078-05-1120\n");
 
-    my $q = PII::Remediation::Quarantine->new(
+    my $q = App::Arcanum::Remediation::Quarantine->new(
         config    => { remediation => { dry_run => 0 } },
         scan_root => $qdir,
     );
@@ -564,7 +564,7 @@ write_file("$scan8/other.txt",
 
     if ($result) {
         ok(!-f $file, 'Quarantine execute: original file removed from source');
-        ok(-d "$qdir/.pii-guardian-quarantine",
+        ok(-d "$qdir/.arcanum-quarantine",
            'Quarantine execute: quarantine directory created');
     }
     else {
@@ -581,7 +581,7 @@ write_file("$scan8/other.txt",
     my $file = write_file("$ddir/todel.csv",
         "name,ssn\nAlice,078-05-1120\n");
 
-    my $del = PII::Remediation::Deleter->new(
+    my $del = App::Arcanum::Remediation::Deleter->new(
         config    => { remediation => { dry_run => 1 } },
         scan_root => $ddir,
     );
@@ -603,7 +603,7 @@ write_file("$scan8/other.txt",
         local $/; my $c = <$fh>; $c;
     });
 
-    my $del = PII::Remediation::Deleter->new(
+    my $del = App::Arcanum::Remediation::Deleter->new(
         config    => { remediation => { dry_run => 0 } },
         scan_root => $ddir,
     );
@@ -613,10 +613,10 @@ write_file("$scan8/other.txt",
 
     if ($ok) {
         ok(!-f $file, 'Deleter execute: file deleted');
-        ok(-f "$ddir/.pii-guardian-tombstones",
+        ok(-f "$ddir/.arcanum-tombstones",
            'Deleter execute: tombstone file created');
 
-        my $ts = PII::Tombstone->new(scan_roots => [$ddir]);
+        my $ts = App::Arcanum::Tombstone->new(scan_roots => [$ddir]);
         ok($ts->entry_count >= 1, 'Deleter execute: tombstone entry in index');
         ok($ts->check($expected_sha),
            'Deleter execute: SHA-256 recorded in tombstone');
@@ -639,7 +639,7 @@ write_file("$scan8/other.txt",
     my $sha     = sha256_hex($content);
 
     # Step 1: record tombstone
-    my $ts = PII::Tombstone->new(scan_roots => [$tsdir]);
+    my $ts = App::Arcanum::Tombstone->new(scan_roots => [$tsdir]);
     $ts->write(
         path      => "$tsdir/original.txt",
         sha256    => $sha,
@@ -799,7 +799,7 @@ SKIP: {
 # ── 30. Guardian — no paths configured dies cleanly ──────────────────────────
 
 {
-    my $g = PII::Guardian->new(overrides => { remediation => { dry_run => 1 } });
+    my $g = App::Arcanum->new(overrides => { remediation => { dry_run => 1 } });
     eval { $g->run_scan([]) };
     ok($@, 'run_scan: no paths configured dies');
     like($@, qr/No paths to scan/i, 'run_scan: error message is helpful');

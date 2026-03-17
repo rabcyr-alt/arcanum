@@ -6,7 +6,7 @@ use File::Temp qw(tempdir);
 use Digest::SHA qw(sha256_hex);
 use Cpanel::JSON::XS ();
 
-use PII::Tombstone;
+use App::Arcanum::Tombstone;
 
 my $JSON   = Cpanel::JSON::XS->new->utf8;
 my $tmpdir = tempdir(CLEANUP => 1);
@@ -24,7 +24,7 @@ sub make_file {
 
 sub slurp_tombstones {
     my ($dir) = @_;
-    my $ts_path = "$dir/.pii-guardian-tombstones";
+    my $ts_path = "$dir/.arcanum-tombstones";
     return [] unless -f $ts_path;
     open my $fh, '<', $ts_path or return [];
     my @entries;
@@ -40,7 +40,7 @@ sub slurp_tombstones {
 # ── Constructor / empty index ─────────────────────────────────────────────────
 
 {
-    my $ts = PII::Tombstone->new(scan_roots => []);
+    my $ts = App::Arcanum::Tombstone->new(scan_roots => []);
     ok(defined $ts,         'Tombstone object created');
     is($ts->entry_count, 0, 'empty index has 0 entries');
 }
@@ -50,7 +50,7 @@ sub slurp_tombstones {
 {
     my $root = "$tmpdir/root1";
     mkdir $root;
-    my $ts = PII::Tombstone->new(scan_roots => [$root]);
+    my $ts = App::Arcanum::Tombstone->new(scan_roots => [$root]);
 
     my $fake_sha = 'a' x 64;
     $ts->write(
@@ -85,7 +85,7 @@ sub slurp_tombstones {
     # Pre-populate a tombstone file
     my $sha_a = 'b' x 64;
     my $sha_b = 'c' x 64;
-    open my $fh, '>', "$root2/.pii-guardian-tombstones" or die;
+    open my $fh, '>', "$root2/.arcanum-tombstones" or die;
     print $fh $JSON->encode({ ts => '2025-01-01T00:00:00Z', sha256 => $sha_a,
                                path => '/old/data.csv', action => 'delete',
                                reason => 'test' }), "\n";
@@ -94,7 +94,7 @@ sub slurp_tombstones {
                                reason => 'test' }), "\n";
     close $fh;
 
-    my $ts = PII::Tombstone->new(scan_roots => [$root2]);
+    my $ts = App::Arcanum::Tombstone->new(scan_roots => [$root2]);
     is($ts->entry_count, 2,  'loaded 2 entries from tombstone file');
     ok($ts->check($sha_a),   'sha_a found in index');
     ok($ts->check($sha_b),   'sha_b found in index');
@@ -110,16 +110,16 @@ sub slurp_tombstones {
 
     my $sha_x = 'x' x 63 . '0';
     my $sha_y = 'y' x 63 . '0';
-    open my $f3, '>', "$root3/.pii-guardian-tombstones" or die;
+    open my $f3, '>', "$root3/.arcanum-tombstones" or die;
     print $f3 $JSON->encode({ ts=>'2025-01-01T00:00:00Z', sha256=>$sha_x,
                                path=>'/x', action=>'delete', reason=>'' }), "\n";
     close $f3;
-    open my $f4, '>', "$root4/.pii-guardian-tombstones" or die;
+    open my $f4, '>', "$root4/.arcanum-tombstones" or die;
     print $f4 $JSON->encode({ ts=>'2025-01-01T00:00:00Z', sha256=>$sha_y,
                                path=>'/y', action=>'delete', reason=>'' }), "\n";
     close $f4;
 
-    my $ts = PII::Tombstone->new(scan_roots => [$root3, $root4]);
+    my $ts = App::Arcanum::Tombstone->new(scan_roots => [$root3, $root4]);
     is($ts->entry_count, 2, 'entries from two roots merged');
     ok($ts->check($sha_x), 'sha_x from root3 found');
     ok($ts->check($sha_y), 'sha_y from root4 found');
@@ -131,12 +131,12 @@ sub slurp_tombstones {
     my $root5 = "$tmpdir/root5";
     mkdir $root5;
     my $sha_z = 'z' x 63 . '1';
-    open my $fz, '>', "$root5/.pii-guardian-tombstones" or die;
+    open my $fz, '>', "$root5/.arcanum-tombstones" or die;
     print $fz $JSON->encode({ ts=>'2025-01-01T00:00:00Z', sha256=>$sha_z,
                                path=>'/z', action=>'delete', reason=>'' }), "\n";
     close $fz;
 
-    my $ts = PII::Tombstone->new(scan_roots => []);
+    my $ts = App::Arcanum::Tombstone->new(scan_roots => []);
     is($ts->entry_count, 0, 'starts empty');
     $ts->add_root($root5);
     is($ts->entry_count, 1, 'add_root loads entries');
@@ -152,13 +152,13 @@ sub slurp_tombstones {
     my $sha     = sha256_hex($content);
 
     # Pre-load tombstone
-    open my $ft, '>', "$root6/.pii-guardian-tombstones" or die;
+    open my $ft, '>', "$root6/.arcanum-tombstones" or die;
     print $ft $JSON->encode({ ts=>'2025-03-01T12:00:00Z', sha256=>$sha,
                                path=>"$root6/original.csv",
                                action=>'delete', reason=>'PII found' }), "\n";
     close $ft;
 
-    my $ts = PII::Tombstone->new(scan_roots => [$root6]);
+    my $ts = App::Arcanum::Tombstone->new(scan_roots => [$root6]);
 
     # Create the file with the same content (simulates reappearance)
     my $reappeared = make_file($root6, 'reappeared.csv', $content);
@@ -181,7 +181,7 @@ sub slurp_tombstones {
 # ── reappearance_finding() ────────────────────────────────────────────────────
 
 {
-    my $ts = PII::Tombstone->new(scan_roots => []);
+    my $ts = App::Arcanum::Tombstone->new(scan_roots => []);
     my $entry = {
         ts     => '2025-03-01T12:00:00Z',
         sha256 => 'abc123def456',
@@ -214,7 +214,7 @@ sub slurp_tombstones {
     my $sha_upper = 'A' x 64;
     my $sha_lower = 'a' x 64;
 
-    my $ts = PII::Tombstone->new(scan_roots => []);
+    my $ts = App::Arcanum::Tombstone->new(scan_roots => []);
     $ts->write(path=>"$root7/f", sha256=>$sha_upper,
                scan_root=>$root7, action=>'delete', reason=>'');
 
@@ -228,7 +228,7 @@ sub slurp_tombstones {
     my $root8 = "$tmpdir/root8";
     mkdir $root8;
     my $good_sha = 'f' x 64;
-    open my $f8, '>', "$root8/.pii-guardian-tombstones" or die;
+    open my $f8, '>', "$root8/.arcanum-tombstones" or die;
     print $f8 "THIS IS NOT JSON\n";
     print $f8 "\n";   # blank line
     print $f8 "   \n"; # whitespace only
@@ -237,7 +237,7 @@ sub slurp_tombstones {
     close $f8;
 
     my $ts;
-    eval { $ts = PII::Tombstone->new(scan_roots => [$root8]) };
+    eval { $ts = App::Arcanum::Tombstone->new(scan_roots => [$root8]) };
     ok(!$@,                  'resilient against malformed tombstone lines');
     ok(defined $ts,          'object created despite bad lines');
     is($ts->entry_count, 1, 'good entry loaded, bad lines skipped');
@@ -249,7 +249,7 @@ sub slurp_tombstones {
 {
     my $root9 = "$tmpdir/root9";
     mkdir $root9;
-    my $ts = PII::Tombstone->new(scan_roots => []);
+    my $ts = App::Arcanum::Tombstone->new(scan_roots => []);
     $ts->write(path=>"$root9/a", sha256=>'1'x64, scan_root=>$root9,
                action=>'delete', reason=>'r1');
     $ts->write(path=>"$root9/b", sha256=>'2'x64, scan_root=>$root9,
@@ -264,7 +264,7 @@ sub slurp_tombstones {
 # ── Guardian integration: tombstone check in run_scan ────────────────────────
 
 {
-    require PII::Guardian;
+    require App::Arcanum;
 
     # Create a temp scan root with a tombstone file and a "reappeared" file
     my $repo = "$tmpdir/guardian_ts_test";
@@ -275,7 +275,7 @@ sub slurp_tombstones {
     my $file    = make_file($repo, 'reappeared.txt', $content);
 
     # Write tombstone pre-populated
-    open my $tf, '>', "$repo/.pii-guardian-tombstones" or die;
+    open my $tf, '>', "$repo/.arcanum-tombstones" or die;
     print $tf $JSON->encode({
         ts     => '2025-01-01T00:00:00Z',
         sha256 => $sha,
@@ -286,7 +286,7 @@ sub slurp_tombstones {
     close $tf;
 
     # Instantiate Guardian with an override that uses the temp dir as scan root
-    my $g = PII::Guardian->new(
+    my $g = App::Arcanum->new(
         paths    => [$repo],
         overrides => {
             'scan.paths'    => [$repo],
@@ -296,7 +296,7 @@ sub slurp_tombstones {
 
     # We just need to verify the Tombstone loads the scan_root correctly
     # Run the internal check directly to avoid needing a full scan setup
-    my $ts = PII::Tombstone->new(scan_roots => [$repo]);
+    my $ts = App::Arcanum::Tombstone->new(scan_roots => [$repo]);
     is($ts->entry_count, 1, 'Guardian scan_root tombstone loaded');
 
     my $hit = $ts->check_file($file);
@@ -311,7 +311,7 @@ sub slurp_tombstones {
 # ── Tombstone written after remediation (Deleter integration) ────────────────
 
 {
-    require PII::Remediation::Deleter;
+    require App::Arcanum::Remediation::Deleter;
 
     my $root10 = "$tmpdir/root10";
     mkdir $root10;
@@ -324,7 +324,7 @@ sub slurp_tombstones {
         local $/; my $c = <$fh>; $c
     });
 
-    my $del = PII::Remediation::Deleter->new(
+    my $del = App::Arcanum::Remediation::Deleter->new(
         config    => { remediation => { dry_run => 0 } },
         scan_root => $root10,
     );
@@ -334,11 +334,11 @@ sub slurp_tombstones {
     skip "delete failed (may need execute mode): $@", 3 if $@;
 
     # Tombstone file should exist now
-    ok(-f "$root10/.pii-guardian-tombstones",
+    ok(-f "$root10/.arcanum-tombstones",
        'tombstone file created after deletion');
 
     # Load it via Tombstone module
-    my $ts = PII::Tombstone->new(scan_roots => [$root10]);
+    my $ts = App::Arcanum::Tombstone->new(scan_roots => [$root10]);
     ok($ts->entry_count >= 1, 'tombstone entry written by Deleter');
 
     my $hit = $ts->check($expected_sha);

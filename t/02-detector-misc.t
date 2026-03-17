@@ -14,22 +14,22 @@ use strict; use warnings;
 use FindBin qw($RealBin); use lib "$RealBin/../lib";
 use Test::More;
 
-use PII::Detector::IPAddress;
-use PII::Detector::MACAddress;
-use PII::Detector::DateOfBirth;
-use PII::Detector::PassportNumber;
-use PII::Detector::CommandLinePII;
-use PII::Detector::IBAN;
-use PII::Detector::VIN;
-use PII::Detector::NIN;
-use PII::Detector::SIN;
-use PII::Detector::TFN;
-use PII::Detector::MedicalID;
-use PII::Detector::NationalID;
-use PII::Detector::PhysicalAddress;
-use PII::Detector::Secrets;
-use PII::Detector::FullEmail;
-use PII::Detector::CalendarEvent;
+use App::Arcanum::Detector::IPAddress;
+use App::Arcanum::Detector::MACAddress;
+use App::Arcanum::Detector::DateOfBirth;
+use App::Arcanum::Detector::PassportNumber;
+use App::Arcanum::Detector::CommandLinePII;
+use App::Arcanum::Detector::IBAN;
+use App::Arcanum::Detector::VIN;
+use App::Arcanum::Detector::NIN;
+use App::Arcanum::Detector::SIN;
+use App::Arcanum::Detector::TFN;
+use App::Arcanum::Detector::MedicalID;
+use App::Arcanum::Detector::NationalID;
+use App::Arcanum::Detector::PhysicalAddress;
+use App::Arcanum::Detector::Secrets;
+use App::Arcanum::Detector::FullEmail;
+use App::Arcanum::Detector::CalendarEvent;
 
 my $EMPTY_CFG = {};
 
@@ -56,7 +56,7 @@ sub interface_ok {
 
 {
     # 203.0.113.0/24 is TEST-NET-3 (RFC 5737) — safe synthetic public IPs
-    my $d = PII::Detector::IPAddress->new(
+    my $d = App::Arcanum::Detector::IPAddress->new(
         config => { detectors => { ip_address => { skip_private_ranges => 0 } } },
     );
     interface_ok($d, 'IPAddress');
@@ -73,7 +73,7 @@ sub interface_ok {
     ok(@f6 >= 1, 'IPAddress: IPv6 detected');
 
     # Private ranges suppressed by default
-    my $d_priv = det('PII::Detector::IPAddress');
+    my $d_priv = det('App::Arcanum::Detector::IPAddress');
     my @priv = $d_priv->detect('host 192.168.1.1 is internal');
     is(scalar @priv, 0, 'IPAddress: private range skipped by default');
 
@@ -87,7 +87,7 @@ sub interface_ok {
 # ══════════════════════════════════════════════════════════════════════════════
 
 {
-    my $d = det('PII::Detector::MACAddress');
+    my $d = det('App::Arcanum::Detector::MACAddress');
     interface_ok($d, 'MACAddress');
     is($d->detector_type, 'mac_address', 'MACAddress: detector_type');
 
@@ -115,7 +115,7 @@ sub interface_ok {
 # ══════════════════════════════════════════════════════════════════════════════
 
 {
-    my $d = det('PII::Detector::DateOfBirth');
+    my $d = det('App::Arcanum::Detector::DateOfBirth');
     interface_ok($d, 'DateOfBirth');
     is($d->detector_type, 'date_of_birth', 'DateOfBirth: detector_type');
 
@@ -147,7 +147,7 @@ sub interface_ok {
 # ══════════════════════════════════════════════════════════════════════════════
 
 {
-    my $d = det('PII::Detector::PassportNumber');
+    my $d = det('App::Arcanum::Detector::PassportNumber');
     interface_ok($d, 'PassportNumber');
     is($d->detector_type, 'passport_number', 'PassportNumber: detector_type');
 
@@ -169,7 +169,7 @@ sub interface_ok {
 # ══════════════════════════════════════════════════════════════════════════════
 
 {
-    my $d = det('PII::Detector::CommandLinePII');
+    my $d = det('App::Arcanum::Detector::CommandLinePII');
     interface_ok($d, 'CommandLinePII');
     is($d->detector_type, 'command_line_pii', 'CommandLinePII: detector_type');
 
@@ -209,17 +209,17 @@ sub interface_ok {
 # ══════════════════════════════════════════════════════════════════════════════
 
 my %stubs = (
-    'PII::Detector::IBAN'            => 'iban',
-    'PII::Detector::VIN'             => 'vin',
-    'PII::Detector::NIN'             => 'nin_uk',
-    'PII::Detector::SIN'             => 'sin_canada',
-    'PII::Detector::TFN'             => 'tfn_australia',
-    'PII::Detector::MedicalID'       => 'medical_id',
-    'PII::Detector::NationalID'      => 'national_id_generic',
-    'PII::Detector::PhysicalAddress' => 'physical_address',
-    'PII::Detector::Secrets'         => 'secrets',
-    'PII::Detector::FullEmail'       => 'full_email_content',
-    'PII::Detector::CalendarEvent'   => 'calendar_event',
+    'App::Arcanum::Detector::IBAN'            => 'iban',
+    'App::Arcanum::Detector::VIN'             => 'vin',
+    'App::Arcanum::Detector::NIN'             => 'nin_uk',
+    'App::Arcanum::Detector::SIN'             => 'sin_canada',
+    'App::Arcanum::Detector::TFN'             => 'tfn_australia',
+    'App::Arcanum::Detector::MedicalID'       => 'medical_id',
+    'App::Arcanum::Detector::NationalID'      => 'national_id_generic',
+    'App::Arcanum::Detector::PhysicalAddress' => 'physical_address',
+    'App::Arcanum::Detector::Secrets'         => 'secrets',
+    'App::Arcanum::Detector::FullEmail'       => 'full_email_content',
+    'App::Arcanum::Detector::CalendarEvent'   => 'calendar_event',
 );
 
 for my $class (sort keys %stubs) {

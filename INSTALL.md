@@ -1,4 +1,4 @@
-# Installing pii-guardian
+# Installing arcanum
 
 ## Requirements
 
@@ -160,24 +160,24 @@ prove -l t/
 perl -Ilib t/00-load.t
 
 # CLI works
-perl -Ilib bin/pii-guardian --version
+perl -Ilib bin/arcanum --version
 ```
 
 ---
 
 ## Running Without Installing
 
-You can run pii-guardian directly from the source tree:
+You can run arcanum directly from the source tree:
 
 ```bash
-perl -Ilib bin/pii-guardian scan /some/path
+perl -Ilib bin/arcanum scan /some/path
 ```
 
 Or set `PERL5LIB` in your environment:
 
 ```bash
-export PERL5LIB=/path/to/pii-guardian/lib:$PERL5LIB
-bin/pii-guardian scan /some/path
+export PERL5LIB=/path/to/arcanum/lib:$PERL5LIB
+bin/arcanum scan /some/path
 ```
 
 ---
@@ -191,8 +191,8 @@ make test
 sudo make install
 ```
 
-This installs the `pii-guardian` script to your system `bin` directory and
-the `PII::*` modules to your system Perl library path.
+This installs the `arcanum` script to your system `bin` directory and
+the `App::Arcanum::*` modules to your system Perl library path.
 
 ---
 
@@ -239,7 +239,7 @@ Ensure `libmagic` development headers are installed:
 - Rocky/RHEL: `dnf install file-devel`
 - Ubuntu/Debian: `apt-get install libmagic-dev`
 
-pii-guardian falls back to `File::MimeInfo` (extension-based) if
+arcanum falls back to `File::MimeInfo` (extension-based) if
 `File::LibMagic` is unavailable — detection is still functional.
 
 ### `GnuPG::Interface` errors

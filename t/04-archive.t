@@ -4,10 +4,10 @@ use FindBin qw($RealBin); use lib "$RealBin/../lib";
 use Test::More;
 use File::Temp qw(tempdir);
 use Path::Tiny ();
-use PII::ArchiveHandler;
-use PII::FileClassifier;
-use PII::Format::CSV;
-use PII::Format::PlainText;
+use App::Arcanum::ArchiveHandler;
+use App::Arcanum::FileClassifier;
+use App::Arcanum::Format::CSV;
+use App::Arcanum::Format::PlainText;
 
 my $FIXTURES = "$RealBin/fixtures";
 
@@ -34,18 +34,18 @@ sub make_cfg {
 }
 
 sub make_handler {
-    PII::ArchiveHandler->new(config => make_cfg(@_));
+    App::Arcanum::ArchiveHandler->new(config => make_cfg(@_));
 }
 
 sub make_classifier {
-    PII::FileClassifier->new(config => make_cfg(@_));
+    App::Arcanum::FileClassifier->new(config => make_cfg(@_));
 }
 
 # Build a minimal scan_fn that returns findings for CSV and plaintext files
 sub make_scan_fn {
     my ($cfg) = @_;
-    my $csv_parser = PII::Format::CSV->new(config => $cfg);
-    my $txt_parser = PII::Format::PlainText->new(config => $cfg);
+    my $csv_parser = App::Arcanum::Format::CSV->new(config => $cfg);
+    my $txt_parser = App::Arcanum::Format::PlainText->new(config => $cfg);
     return sub {
         my ($fi) = @_;
         # Return fake findings carrying the segments as "findings"
@@ -69,7 +69,7 @@ SKIP: {
     skip "sample.tar.gz not found", 6 unless -f "$FIXTURES/sample.tar.gz";
 
     my $cfg         = make_cfg();
-    my $handler     = PII::ArchiveHandler->new(config => $cfg);
+    my $handler     = App::Arcanum::ArchiveHandler->new(config => $cfg);
     my $classifier  = make_classifier();
     my $scan_fn     = make_scan_fn($cfg);
 
@@ -98,7 +98,7 @@ SKIP: {
     skip "sample.zip not found", 4 unless -f "$FIXTURES/sample.zip";
 
     my $cfg        = make_cfg();
-    my $handler    = PII::ArchiveHandler->new(config => $cfg);
+    my $handler    = App::Arcanum::ArchiveHandler->new(config => $cfg);
     my $classifier = make_classifier();
     my $scan_fn    = make_scan_fn($cfg);
 
@@ -123,7 +123,7 @@ SKIP: {
     skip "sample.gz not found", 3 unless -f "$FIXTURES/sample.gz";
 
     my $cfg        = make_cfg();
-    my $handler    = PII::ArchiveHandler->new(config => $cfg);
+    my $handler    = App::Arcanum::ArchiveHandler->new(config => $cfg);
     my $classifier = make_classifier();
     my $scan_fn    = make_scan_fn($cfg);
 
@@ -147,7 +147,7 @@ SKIP: {
     skip "nested.tar.gz not found", 3 unless -f "$FIXTURES/nested.tar.gz";
 
     my $cfg        = make_cfg();
-    my $handler    = PII::ArchiveHandler->new(config => $cfg);
+    my $handler    = App::Arcanum::ArchiveHandler->new(config => $cfg);
     my $classifier = make_classifier();
     my $scan_fn    = make_scan_fn($cfg);
 
@@ -174,7 +174,7 @@ SKIP: {
     skip "sample.tar.gz not found", 1 unless -f "$FIXTURES/sample.tar.gz";
 
     my $cfg = make_cfg(archives => { max_extracted_bytes => 1 });  # 1 byte limit
-    my $handler    = PII::ArchiveHandler->new(config => $cfg);
+    my $handler    = App::Arcanum::ArchiveHandler->new(config => $cfg);
     my $classifier = make_classifier();
 
     my $fi = {
@@ -193,7 +193,7 @@ SKIP: {
     skip "sample.tar.gz not found", 1 unless -f "$FIXTURES/sample.tar.gz";
 
     my $cfg = make_cfg(archives => { nested_max_depth => 0 });
-    my $handler    = PII::ArchiveHandler->new(config => $cfg);
+    my $handler    = App::Arcanum::ArchiveHandler->new(config => $cfg);
     my $classifier = make_classifier();
 
     my $fi = {
@@ -212,7 +212,7 @@ SKIP: {
     skip "sample.tar.gz not found", 1 unless -f "$FIXTURES/sample.tar.gz";
 
     my $cfg        = make_cfg();
-    my $handler    = PII::ArchiveHandler->new(config => $cfg);
+    my $handler    = App::Arcanum::ArchiveHandler->new(config => $cfg);
     my $classifier = make_classifier();
 
     # Capture temp dirs created during extraction by checking /tmp before/after

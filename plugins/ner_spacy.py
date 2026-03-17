@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """
-pii-guardian plugin: ner_spacy
+arcanum plugin: ner_spacy
 NER-based PII detection using spaCy.
 
-Reads one JSON object from stdin (pii-guardian plugin contract),
+Reads one JSON object from stdin (arcanum plugin contract),
 runs spaCy named-entity recognition over each text segment, and
 writes one JSON object with findings to stdout.
 
 Requires: pip install spacy && python -m spacy download en_core_web_sm
           (or en_core_web_md / en_core_web_lg for higher accuracy)
 
-Config block (under detectors.ner_spacy in pii-guardian config):
+Config block (under detectors.ner_spacy in arcanum config):
 
     {
       "enabled": true,
@@ -38,7 +38,7 @@ Exit codes:
 import sys
 import json
 
-# ── NER label → pii-guardian finding type mapping ─────────────────────────────
+# ── NER label → arcanum finding type mapping ─────────────────────────────
 # Labels: https://spacy.io/api/annotation#named-entities
 # Set a label to None to discard that entity type entirely.
 

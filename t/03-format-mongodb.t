@@ -3,13 +3,13 @@ use strict; use warnings;
 use FindBin qw($RealBin); use lib "$RealBin/../lib";
 use Test::More;
 use File::Temp qw(tempdir);
-use PII::Format::MongoDB;
+use App::Arcanum::Format::MongoDB;
 
 my $FIXTURES = "$RealBin/fixtures";
 my $tmpdir   = tempdir(CLEANUP => 1);
 
 sub mk {
-    PII::Format::MongoDB->new(config => {
+    App::Arcanum::Format::MongoDB->new(config => {
         remediation => { corrupt_file_action => 'plaintext' },
     });
 }

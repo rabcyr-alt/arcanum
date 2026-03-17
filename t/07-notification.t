@@ -3,13 +3,13 @@ use strict; use warnings;
 use FindBin qw($RealBin); use lib "$RealBin/../lib";
 use Test::More;
 
-use PII::Notification::Base;
-use PII::Notification::Email;
-use PII::Notification::Webhook;
-use PII::Notification::GitHub;
-use PII::Notification::GitLab;
-use PII::Notification::Bitbucket;
-use PII::Notification::Dispatcher;
+use App::Arcanum::Notification::Base;
+use App::Arcanum::Notification::Email;
+use App::Arcanum::Notification::Webhook;
+use App::Arcanum::Notification::GitHub;
+use App::Arcanum::Notification::GitLab;
+use App::Arcanum::Notification::Bitbucket;
+use App::Arcanum::Notification::Dispatcher;
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -61,7 +61,7 @@ sub sample_scan_results {
 # ── Base: build_body ──────────────────────────────────────────────────────────
 
 {
-    my $b = PII::Notification::Email->new(config => disabled_cfg());
+    my $b = App::Arcanum::Notification::Email->new(config => disabled_cfg());
 
     my $payload = {
         ts          => '2026-03-16T10:00:00Z',
@@ -79,7 +79,7 @@ sub sample_scan_results {
 
     my $body = $b->build_body($payload);
     ok(defined $body && length($body), 'build_body returns content');
-    like($body, qr/pii-guardian/,         'body mentions pii-guardian');
+    like($body, qr/arcanum/,         'body mentions arcanum');
     like($body, qr|/repo/data\.csv|,      'body mentions affected file');
     like($body, qr/filter-repo/,          'body includes rewrite command');
     like($body, qr/collaborat/i,          'body has collaborator steps');
@@ -90,32 +90,32 @@ sub sample_scan_results {
 # ── is_enabled ────────────────────────────────────────────────────────────────
 
 {
-    ok(!PII::Notification::Email->new(config => disabled_cfg())->is_enabled,
+    ok(!App::Arcanum::Notification::Email->new(config => disabled_cfg())->is_enabled,
        'email disabled when enabled=0');
 
     my $cfg = disabled_cfg();
     $cfg->{notifications}{email}{enabled} = 1;
-    ok(PII::Notification::Email->new(config => $cfg)->is_enabled,
+    ok(App::Arcanum::Notification::Email->new(config => $cfg)->is_enabled,
        'email enabled when enabled=1');
 }
 
 # ── backend_name ─────────────────────────────────────────────────────────────
 
-is(PII::Notification::Email->new(  config => disabled_cfg())->backend_name, 'email',   'Email backend_name');
-is(PII::Notification::Webhook->new(config => disabled_cfg())->backend_name, 'webhook', 'Webhook backend_name');
-is(PII::Notification::GitHub->new( config => disabled_cfg())->backend_name, 'github',  'GitHub backend_name');
-is(PII::Notification::GitLab->new( config => disabled_cfg())->backend_name, 'gitlab',  'GitLab backend_name');
+is(App::Arcanum::Notification::Email->new(  config => disabled_cfg())->backend_name, 'email',   'Email backend_name');
+is(App::Arcanum::Notification::Webhook->new(config => disabled_cfg())->backend_name, 'webhook', 'Webhook backend_name');
+is(App::Arcanum::Notification::GitHub->new( config => disabled_cfg())->backend_name, 'github',  'GitHub backend_name');
+is(App::Arcanum::Notification::GitLab->new( config => disabled_cfg())->backend_name, 'gitlab',  'GitLab backend_name');
 
 # ── Disabled backends return 0 without crashing ───────────────────────────────
 
 {
     my $payload = { subject => 'test', summary => 'test' };
     for my $cls (qw(
-        PII::Notification::Email
-        PII::Notification::Webhook
-        PII::Notification::GitHub
-        PII::Notification::GitLab
-        PII::Notification::Bitbucket
+        App::Arcanum::Notification::Email
+        App::Arcanum::Notification::Webhook
+        App::Arcanum::Notification::GitHub
+        App::Arcanum::Notification::GitLab
+        App::Arcanum::Notification::Bitbucket
     )) {
         my $b = $cls->new(config => disabled_cfg());
         my $ok = eval { $b->send($payload) };
@@ -126,7 +126,7 @@ is(PII::Notification::GitLab->new( config => disabled_cfg())->backend_name, 'git
 # ── Dispatcher: build_payload ─────────────────────────────────────────────────
 
 {
-    my $d = PII::Notification::Dispatcher->new(config => disabled_cfg());
+    my $d = App::Arcanum::Notification::Dispatcher->new(config => disabled_cfg());
     my $scan = sample_scan_results();
     my $payload = $d->build_payload($scan, [], contact => 'sec@example.com', deadline_days => 5);
 
@@ -155,7 +155,7 @@ is(PII::Notification::GitLab->new( config => disabled_cfg())->backend_name, 'git
 # ── Dispatcher with rewriter plans ────────────────────────────────────────────
 
 {
-    my $d    = PII::Notification::Dispatcher->new(config => disabled_cfg());
+    my $d    = App::Arcanum::Notification::Dispatcher->new(config => disabled_cfg());
     my $scan = sample_scan_results();
     my $plans = [{
         repo_root  => '/repo',
@@ -172,7 +172,7 @@ is(PII::Notification::GitLab->new( config => disabled_cfg())->backend_name, 'git
 # ── Dispatcher: no backends enabled -> sent=0, failed=0 ──────────────────────
 
 {
-    my $d    = PII::Notification::Dispatcher->new(config => disabled_cfg());
+    my $d    = App::Arcanum::Notification::Dispatcher->new(config => disabled_cfg());
     my $scan = sample_scan_results();
     my $res  = $d->dispatch($scan, []);
     is($res->{sent},   0, 'no backends enabled: sent=0');
@@ -182,11 +182,11 @@ is(PII::Notification::GitLab->new( config => disabled_cfg())->backend_name, 'git
 # ── Deadline calculation (business days) ──────────────────────────────────────
 
 {
-    my $d = PII::Notification::Dispatcher->new(config => disabled_cfg());
-    my $deadline = PII::Notification::Dispatcher::_business_deadline(5);
+    my $d = App::Arcanum::Notification::Dispatcher->new(config => disabled_cfg());
+    my $deadline = App::Arcanum::Notification::Dispatcher::_business_deadline(5);
     ok(defined $deadline && $deadline =~ /^\d{4}-\d{2}-\d{2}$/, 'deadline is YYYY-MM-DD');
 
-    my $zero = PII::Notification::Dispatcher::_business_deadline(0);
+    my $zero = App::Arcanum::Notification::Dispatcher::_business_deadline(0);
     ok($zero eq $deadline || $zero lt $deadline || $zero gt $deadline, 'deadline(0) returns a date');
 }
 

@@ -2,12 +2,12 @@
 use strict; use warnings;
 use FindBin qw($RealBin); use lib "$RealBin/../lib";
 use Test::More;
-use PII::Format::CSV;
+use App::Arcanum::Format::CSV;
 
 my $FIXTURES = "$RealBin/fixtures";
 
 sub mk {
-    PII::Format::CSV->new(config => {
+    App::Arcanum::Format::CSV->new(config => {
         remediation => { corrupt_file_action => 'plaintext' },
     });
 }
@@ -59,7 +59,7 @@ ok(@name_cells, 'name column cells have key_context=name');
 
 # Corrupt file — skip action
 {
-    my $p = PII::Format::CSV->new(config => {
+    my $p = App::Arcanum::Format::CSV->new(config => {
         remediation => { corrupt_file_action => 'skip' },
     });
     my @s = $p->parse('/nonexistent/file.csv', $fi_csv);
@@ -68,7 +68,7 @@ ok(@name_cells, 'name column cells have key_context=name');
 
 # Corrupt file — error action
 {
-    my $p = PII::Format::CSV->new(config => {
+    my $p = App::Arcanum::Format::CSV->new(config => {
         remediation => { corrupt_file_action => 'error' },
     });
     eval { $p->parse('/nonexistent/file.csv', $fi_csv) };

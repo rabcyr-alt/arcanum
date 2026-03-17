@@ -5,10 +5,10 @@ use Test::More;
 use File::Temp qw(tempdir);
 use Path::Tiny ();
 
-use PII::Remediation::Base;
-use PII::Remediation::Deleter;
-use PII::Remediation::Redactor;
-use PII::Remediation::Quarantine;
+use App::Arcanum::Remediation::Base;
+use App::Arcanum::Remediation::Deleter;
+use App::Arcanum::Remediation::Redactor;
+use App::Arcanum::Remediation::Quarantine;
 
 # ── Config helpers ────────────────────────────────────────────────────────────
 
@@ -16,7 +16,7 @@ sub dry_cfg {
     return {
         remediation => {
             dry_run      => 1,
-            quarantine_dir => '.pii-guardian-quarantine',
+            quarantine_dir => '.arcanum-quarantine',
             deletion => {
                 secure_overwrite     => 0,
                 secure_overwrite_for => [qw(ssn_us credit_card)],
@@ -48,20 +48,20 @@ sub tmproot { tempdir(CLEANUP => 1) }
 
 # is_dry_run
 {
-    my $b = PII::Remediation::Deleter->new(config => dry_cfg(), scan_root => tmproot());
+    my $b = App::Arcanum::Remediation::Deleter->new(config => dry_cfg(), scan_root => tmproot());
     ok($b->is_dry_run, 'dry_run=1 -> is_dry_run true');
 
-    my $b2 = PII::Remediation::Deleter->new(config => live_cfg(), scan_root => tmproot());
+    my $b2 = App::Arcanum::Remediation::Deleter->new(config => live_cfg(), scan_root => tmproot());
     ok(!$b2->is_dry_run, 'dry_run=0 -> is_dry_run false');
 }
 
 # audit_log writes JSON Lines
 {
     my $root = tmproot();
-    my $b = PII::Remediation::Deleter->new(config => dry_cfg(), scan_root => $root);
+    my $b = App::Arcanum::Remediation::Deleter->new(config => dry_cfg(), scan_root => $root);
     $b->audit_log({ action => 'test', file => '/tmp/x.csv' });
 
-    my $log = Path::Tiny->new($root)->child('.pii-guardian-audit.jsonl');
+    my $log = Path::Tiny->new($root)->child('.arcanum-audit.jsonl');
     ok(-f "$log", 'audit log file created');
     my $content = $log->slurp_utf8;
     like($content, qr/"action"/, 'audit log contains action key');
@@ -72,7 +72,7 @@ sub tmproot { tempdir(CLEANUP => 1) }
 # tombstone write/read round-trip
 {
     my $root = tmproot();
-    my $b = PII::Remediation::Deleter->new(config => dry_cfg(), scan_root => $root);
+    my $b = App::Arcanum::Remediation::Deleter->new(config => dry_cfg(), scan_root => $root);
     $b->write_tombstone('/tmp/secret.csv', 'abc123', action => 'delete');
 
     my $entries = $b->load_tombstones;
@@ -87,7 +87,7 @@ sub tmproot { tempdir(CLEANUP => 1) }
     my $root = tmproot();
     my $f = Path::Tiny->new($root)->child('hash_test.txt');
     $f->spew_utf8("hello\n");
-    my $b = PII::Remediation::Deleter->new(config => dry_cfg(), scan_root => $root);
+    my $b = App::Arcanum::Remediation::Deleter->new(config => dry_cfg(), scan_root => $root);
     my $h = $b->file_sha256("$f");
     ok(defined $h && length($h) == 64, 'file_sha256 returns 64-char hex');
     is($b->file_sha256('/nonexistent/path'), undef, 'nonexistent file -> undef');
@@ -98,7 +98,7 @@ sub tmproot { tempdir(CLEANUP => 1) }
     my $root = tmproot();
     my $f = Path::Tiny->new($root)->child('orig.txt');
     $f->spew_utf8("original content\n");
-    my $b = PII::Remediation::Deleter->new(config => dry_cfg(), scan_root => $root);
+    my $b = App::Arcanum::Remediation::Deleter->new(config => dry_cfg(), scan_root => $root);
     my $bak = $b->backup_file("$f");
     ok(defined $bak, 'backup_file returns path');
     ok(-f $bak, 'backup file exists');
@@ -114,12 +114,12 @@ sub tmproot { tempdir(CLEANUP => 1) }
     my $f = Path::Tiny->new($root)->child('pii.txt');
     $f->spew_utf8("alice\@example.com\n");
 
-    my $d = PII::Remediation::Deleter->new(config => dry_cfg(), scan_root => $root);
+    my $d = App::Arcanum::Remediation::Deleter->new(config => dry_cfg(), scan_root => $root);
     my $ok = $d->delete("$f", reason => 'test');
     ok($ok, 'dry-run delete returns 1');
     ok(-f "$f", 'dry-run: file not deleted');
 
-    my $log = Path::Tiny->new($root)->child('.pii-guardian-audit.jsonl');
+    my $log = Path::Tiny->new($root)->child('.arcanum-audit.jsonl');
     ok(-f "$log", 'dry-run delete: audit log written');
 }
 
@@ -129,7 +129,7 @@ sub tmproot { tempdir(CLEANUP => 1) }
     my $f = Path::Tiny->new($root)->child('pii.txt');
     $f->spew_utf8("alice\@example.com\n");
 
-    my $d = PII::Remediation::Deleter->new(config => live_cfg(), scan_root => $root);
+    my $d = App::Arcanum::Remediation::Deleter->new(config => live_cfg(), scan_root => $root);
     my $ok = $d->delete("$f", reason => 'live test');
     ok($ok, 'live delete returns 1');
     ok(!-f "$f", 'live delete: file removed');
@@ -142,7 +142,7 @@ sub tmproot { tempdir(CLEANUP => 1) }
 # nonexistent file
 {
     my $root = tmproot();
-    my $d = PII::Remediation::Deleter->new(config => live_cfg(), scan_root => $root);
+    my $d = App::Arcanum::Remediation::Deleter->new(config => live_cfg(), scan_root => $root);
     my $ok = $d->delete('/nonexistent/ghost.txt');
     is($ok, 0, 'delete of nonexistent file returns 0');
 }
@@ -155,7 +155,7 @@ sub tmproot { tempdir(CLEANUP => 1) }
     my $f = Path::Tiny->new($root)->child('data.txt');
     $f->spew_utf8("Contact alice\@example.com for details\n");
 
-    my $r = PII::Remediation::Redactor->new(config => dry_cfg(), scan_root => $root);
+    my $r = App::Arcanum::Remediation::Redactor->new(config => dry_cfg(), scan_root => $root);
     my $findings = [{ type => 'email_address', value => 'alice@example.com' }];
     my $ok = $r->redact("$f", $findings, { extension_group => 'text' });
     ok($ok, 'dry-run redact returns 1');
@@ -168,7 +168,7 @@ sub tmproot { tempdir(CLEANUP => 1) }
     my $f = Path::Tiny->new($root)->child('data.txt');
     $f->spew_utf8("Contact alice\@example.com for details\nSSN: 123-45-6789\n");
 
-    my $r = PII::Remediation::Redactor->new(config => live_cfg(), scan_root => $root);
+    my $r = App::Arcanum::Remediation::Redactor->new(config => live_cfg(), scan_root => $root);
     my $findings = [
         { type => 'email_address', value => 'alice@example.com' },
         { type => 'ssn_us',        value => '123-45-6789' },
@@ -183,7 +183,7 @@ sub tmproot { tempdir(CLEANUP => 1) }
     like($content,   qr/\[REDACTED-SSN\]/,     'SSN mask present');
 
     # backup exists
-    my @baks = glob("${f}.pii-guardian-backup-*");
+    my @baks = glob("${f}.arcanum-backup-*");
     ok(@baks, 'backup file created');
 }
 
@@ -193,7 +193,7 @@ sub tmproot { tempdir(CLEANUP => 1) }
     my $f = Path::Tiny->new($root)->child('data.csv');
     $f->spew_utf8("name,email\nAlice Smith,alice\@example.com\nBob Jones,bob\@example.org\n");
 
-    my $r = PII::Remediation::Redactor->new(config => live_cfg(), scan_root => $root);
+    my $r = App::Arcanum::Remediation::Redactor->new(config => live_cfg(), scan_root => $root);
     my $findings = [
         { type => 'email_address', value => 'alice@example.com' },
         { type => 'email_address', value => 'bob@example.org' },
@@ -214,7 +214,7 @@ sub tmproot { tempdir(CLEANUP => 1) }
     my $f = Path::Tiny->new($root)->child('data.json');
     $f->spew_utf8('{"user":{"email":"alice@example.com","name":"Alice Smith"}}' . "\n");
 
-    my $r = PII::Remediation::Redactor->new(config => live_cfg(), scan_root => $root);
+    my $r = App::Arcanum::Remediation::Redactor->new(config => live_cfg(), scan_root => $root);
     my $findings = [{ type => 'email_address', value => 'alice@example.com' }];
     my $ok = $r->redact("$f", $findings, { extension_group => 'data_json' });
     ok($ok, 'live JSON redact returns 1');
@@ -231,7 +231,7 @@ sub tmproot { tempdir(CLEANUP => 1) }
     my $f = Path::Tiny->new($root)->child('data.yaml');
     $f->spew_utf8("user:\n  email: alice\@example.com\n  name: Alice Smith\n");
 
-    my $r = PII::Remediation::Redactor->new(config => live_cfg(), scan_root => $root);
+    my $r = App::Arcanum::Remediation::Redactor->new(config => live_cfg(), scan_root => $root);
     my $findings = [{ type => 'email_address', value => 'alice@example.com' }];
     my $ok = $r->redact("$f", $findings, { extension_group => 'data_yaml' });
     ok($ok, 'live YAML redact returns 1');
@@ -247,7 +247,7 @@ sub tmproot { tempdir(CLEANUP => 1) }
     my $f = Path::Tiny->new($root)->child('file.bin');
     $f->spew_raw("\x00\x01\x02\x03");
 
-    my $r = PII::Remediation::Redactor->new(config => live_cfg(), scan_root => $root);
+    my $r = App::Arcanum::Remediation::Redactor->new(config => live_cfg(), scan_root => $root);
     my $ok = $r->redact("$f", [{ type => 'email_address', value => 'x@y.com' }],
                          { extension_group => 'binary' });
     is($ok, 0, 'binary file redact returns 0');
@@ -261,7 +261,7 @@ sub tmproot { tempdir(CLEANUP => 1) }
     my $f = Path::Tiny->new($root)->child('export.csv');
     $f->spew_utf8("name,email\nAlice,alice\@example.com\n");
 
-    my $q = PII::Remediation::Quarantine->new(config => dry_cfg(), scan_root => $root);
+    my $q = App::Arcanum::Remediation::Quarantine->new(config => dry_cfg(), scan_root => $root);
     my $dest = $q->quarantine("$f",
         reason          => 'test',
         git_status      => 'untracked',
@@ -279,7 +279,7 @@ sub tmproot { tempdir(CLEANUP => 1) }
     $f->spew_utf8("name,email\nAlice,alice\@example.com\n");
 
     my $cfg = live_cfg();
-    my $q = PII::Remediation::Quarantine->new(config => $cfg, scan_root => $root);
+    my $q = App::Arcanum::Remediation::Quarantine->new(config => $cfg, scan_root => $root);
     my $dest = $q->quarantine("$f",
         reason          => 'live test',
         git_status      => 'untracked',
@@ -292,7 +292,7 @@ sub tmproot { tempdir(CLEANUP => 1) }
     ok(-f $dest,        'quarantined file exists at destination');
     ok(!-f "$f",        'original file moved (no longer at source)');
 
-    my $meta_path = "${dest}.pii-guardian-meta";
+    my $meta_path = "${dest}.arcanum-meta";
     ok(-f $meta_path,  'meta sidecar file created');
 
     my $meta = eval { Cpanel::JSON::XS->new->utf8->decode(

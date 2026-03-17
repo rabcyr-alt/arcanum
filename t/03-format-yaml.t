@@ -2,12 +2,12 @@
 use strict; use warnings;
 use FindBin qw($RealBin); use lib "$RealBin/../lib";
 use Test::More;
-use PII::Format::YAML;
+use App::Arcanum::Format::YAML;
 
 my $FIXTURES = "$RealBin/fixtures";
 
 sub mk {
-    PII::Format::YAML->new(config => {
+    App::Arcanum::Format::YAML->new(config => {
         remediation => { corrupt_file_action => 'plaintext' },
     });
 }

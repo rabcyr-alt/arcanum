@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# pii-guardian plugin: secrets_gitleaks
+# arcanum plugin: secrets_gitleaks
 #
 # Wraps the gitleaks binary to detect secrets (API keys, tokens, private keys)
 # in text segments.  This plugin supplements the built-in Secrets detector with
@@ -7,7 +7,7 @@
 #
 # Requires: gitleaks >= 8  (https://github.com/gitleaks/gitleaks)
 #
-# Config block (under detectors.secrets_gitleaks in pii-guardian config):
+# Config block (under detectors.secrets_gitleaks in arcanum config):
 #
 #   {
 #     "enabled": false,
@@ -15,9 +15,9 @@
 #     "timeout": 30
 #   }
 #
-# pii-guardian plugin contract: reads one JSON object from stdin,
+# arcanum plugin contract: reads one JSON object from stdin,
 # writes one JSON object (with "findings" array) to stdout.
-# Non-zero exit = failure; pii-guardian logs warning and continues.
+# Non-zero exit = failure; arcanum logs warning and continues.
 
 set -euo pipefail
 
@@ -25,7 +25,7 @@ set -euo pipefail
 
 GITLEAKS_BIN="gitleaks"
 
-# Read config from environment if set (pii-guardian may inject it)
+# Read config from environment if set (arcanum may inject it)
 if [ -n "${PII_GITLEAKS_PATH:-}" ]; then
     GITLEAKS_BIN="$PII_GITLEAKS_PATH"
 fi

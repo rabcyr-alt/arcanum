@@ -2,11 +2,11 @@
 use strict; use warnings;
 use FindBin qw($RealBin); use lib "$RealBin/../lib";
 use Test::More;
-use PII::Detector::Name;
+use App::Arcanum::Detector::Name;
 
 sub mk {
     my (%extra) = @_;
-    PII::Detector::Name->new(config => {
+    App::Arcanum::Detector::Name->new(config => {
         default_level => 'normal',
         detectors => { name => {
             enabled => 1, level => 'normal',
@@ -40,7 +40,7 @@ sub mk {
   is(scalar @f, 0, 'no names in plain sentence'); }
 
 # Attribution lines skipped
-{ my $d = PII::Detector::Name->new(config => {
+{ my $d = App::Arcanum::Detector::Name->new(config => {
       default_level => 'normal',
       detectors => { name => { enabled => 1, level => 'normal', strategy => 'namelist', min_score => 0.7 } },
       allowlist => { names => ['Alice Smith'], attribution_patterns => [
@@ -51,7 +51,7 @@ sub mk {
   is(scalar @f, 0, 'name on attribution line not a finding'); }
 
 # Allowlisted name
-{ my $d = PII::Detector::Name->new(config => {
+{ my $d = App::Arcanum::Detector::Name->new(config => {
       default_level => 'normal',
       detectors => { name => { enabled => 1, level => 'normal', strategy => 'namelist', min_score => 0.7 } },
       allowlist => { names => ['Alice Smith'], attribution_patterns => [] },
@@ -61,7 +61,7 @@ sub mk {
   ok(@al, 'allowlisted name is marked allowlisted'); }
 
 # Disabled
-{ my $d = PII::Detector::Name->new(config => {
+{ my $d = App::Arcanum::Detector::Name->new(config => {
       default_level => 'normal',
       detectors => { name => { enabled => 0 } },
       allowlist => { names => [], attribution_patterns => [] },

@@ -7,7 +7,7 @@ use File::Path qw(make_path);
 use POSIX      qw(SIGTERM);
 use Cpanel::JSON::XS ();
 
-use PII::Detector::Plugin;
+use App::Arcanum::Detector::Plugin;
 
 my $JSON = Cpanel::JSON::XS->new->utf8;
 
@@ -93,20 +93,20 @@ make_mock_plugin($plugin_dir, 'slow_plugin',        $SLOW_PLUGIN);
 # ── find_plugin_executable ────────────────────────────────────────────────────
 
 {
-    my $found = PII::Detector::Plugin->find_plugin_executable('echo_plugin', $tmpdir);
+    my $found = App::Arcanum::Detector::Plugin->find_plugin_executable('echo_plugin', $tmpdir);
     ok(defined $found, 'find_plugin_executable finds plugin in config_dir/plugins/');
     like($found, qr/echo_plugin/, 'path contains plugin name');
 }
 
 {
-    my $not_found = PII::Detector::Plugin->find_plugin_executable('no_such_plugin_xyz', $tmpdir);
+    my $not_found = App::Arcanum::Detector::Plugin->find_plugin_executable('no_such_plugin_xyz', $tmpdir);
     ok(!defined $not_found, 'find_plugin_executable returns undef for missing plugin');
 }
 
 # ── Constructor ───────────────────────────────────────────────────────────────
 
 {
-    my $det = PII::Detector::Plugin->new(
+    my $det = App::Arcanum::Detector::Plugin->new(
         config      => {},
         plugin_name => 'echo_plugin',
         plugin_cfg  => { enabled => 1 },
@@ -118,7 +118,7 @@ make_mock_plugin($plugin_dir, 'slow_plugin',        $SLOW_PLUGIN);
 }
 
 {
-    my $det = PII::Detector::Plugin->new(
+    my $det = App::Arcanum::Detector::Plugin->new(
         config      => {},
         plugin_name => 'echo_plugin',
         plugin_cfg  => { enabled => 0 },
@@ -128,7 +128,7 @@ make_mock_plugin($plugin_dir, 'slow_plugin',        $SLOW_PLUGIN);
 }
 
 {
-    my $det = PII::Detector::Plugin->new(
+    my $det = App::Arcanum::Detector::Plugin->new(
         config      => {},
         plugin_name => 'echo_plugin',
         plugin_cfg  => {},   # enabled not set
@@ -140,7 +140,7 @@ make_mock_plugin($plugin_dir, 'slow_plugin',        $SLOW_PLUGIN);
 # ── detect(): happy path ──────────────────────────────────────────────────────
 
 {
-    my $det = PII::Detector::Plugin->new(
+    my $det = App::Arcanum::Detector::Plugin->new(
         config      => {},
         plugin_name => 'echo_plugin',
         plugin_cfg  => { enabled => 1 },
@@ -168,7 +168,7 @@ make_mock_plugin($plugin_dir, 'slow_plugin',        $SLOW_PLUGIN);
 # ── detect(): no findings ─────────────────────────────────────────────────────
 
 {
-    my $det = PII::Detector::Plugin->new(
+    my $det = App::Arcanum::Detector::Plugin->new(
         config      => {},
         plugin_name => 'echo_plugin',
         plugin_cfg  => { enabled => 1 },
@@ -181,7 +181,7 @@ make_mock_plugin($plugin_dir, 'slow_plugin',        $SLOW_PLUGIN);
 # ── detect(): plugin not found ────────────────────────────────────────────────
 
 {
-    my $det = PII::Detector::Plugin->new(
+    my $det = App::Arcanum::Detector::Plugin->new(
         config      => {},
         plugin_name => 'no_such_plugin_xyz',
         plugin_cfg  => { enabled => 1 },
@@ -199,7 +199,7 @@ make_mock_plugin($plugin_dir, 'slow_plugin',        $SLOW_PLUGIN);
 # ── detect(): plugin exits non-zero ──────────────────────────────────────────
 
 {
-    my $det = PII::Detector::Plugin->new(
+    my $det = App::Arcanum::Detector::Plugin->new(
         config      => {},
         plugin_name => 'fail_plugin',
         plugin_cfg  => { enabled => 1 },
@@ -213,7 +213,7 @@ make_mock_plugin($plugin_dir, 'slow_plugin',        $SLOW_PLUGIN);
 # ── detect(): invalid JSON output ────────────────────────────────────────────
 
 {
-    my $det = PII::Detector::Plugin->new(
+    my $det = App::Arcanum::Detector::Plugin->new(
         config      => {},
         plugin_name => 'badjson_plugin',
         plugin_cfg  => { enabled => 1 },
@@ -227,7 +227,7 @@ make_mock_plugin($plugin_dir, 'slow_plugin',        $SLOW_PLUGIN);
 # ── detect(): missing findings key ────────────────────────────────────────────
 
 {
-    my $det = PII::Detector::Plugin->new(
+    my $det = App::Arcanum::Detector::Plugin->new(
         config      => {},
         plugin_name => 'nofindings_plugin',
         plugin_cfg  => { enabled => 1 },
@@ -240,7 +240,7 @@ make_mock_plugin($plugin_dir, 'slow_plugin',        $SLOW_PLUGIN);
 # ── detect(): timeout ────────────────────────────────────────────────────────
 
 {
-    my $det = PII::Detector::Plugin->new(
+    my $det = App::Arcanum::Detector::Plugin->new(
         config      => {},
         plugin_name => 'slow_plugin',
         plugin_cfg  => { enabled => 1, timeout => 2 },
@@ -260,7 +260,7 @@ make_mock_plugin($plugin_dir, 'slow_plugin',        $SLOW_PLUGIN);
     my $cfg = {
         allowlist => { emails => ['alice@example.com'] },
     };
-    my $det = PII::Detector::Plugin->new(
+    my $det = App::Arcanum::Detector::Plugin->new(
         config      => $cfg,
         plugin_name => 'echo_plugin',
         plugin_cfg  => { enabled => 1 },
@@ -303,7 +303,7 @@ for my $seg (@{ $req->{segments} // [] }) {
 print $JSON->encode({ findings => \@findings });
 PLUGIN
 
-    my $det = PII::Detector::Plugin->new(
+    my $det = App::Arcanum::Detector::Plugin->new(
         config      => {},
         plugin_name => 'ctx_plugin',
         plugin_cfg  => { enabled => 1 },
@@ -337,7 +337,7 @@ push @errs, 'seg missing text' unless defined $seg->{text};
 print $JSON->encode({ findings => [], validation_errors => \@errs });
 PLUGIN
 
-    my $det = PII::Detector::Plugin->new(
+    my $det = App::Arcanum::Detector::Plugin->new(
         config      => {},
         plugin_name => 'validate_plugin',
         plugin_cfg  => { enabled => 1 },
@@ -372,7 +372,7 @@ PLUGIN
 # ── Guardian plugin loading from config ───────────────────────────────────────
 
 {
-    require PII::Guardian;
+    require App::Arcanum;
 
     # Config with a plugin in the plugins[] array
     my $cfg = {
@@ -383,7 +383,7 @@ PLUGIN
     };
 
     # Guardian's _build_plugin_detectors
-    my $g = PII::Guardian->new(
+    my $g = App::Arcanum->new(
         paths      => [],
         overrides  => {},
     );
@@ -409,8 +409,8 @@ PLUGIN
             },
         },
     };
-    require PII::Guardian;
-    my $g = PII::Guardian->new(paths => [], overrides => {});
+    require App::Arcanum;
+    my $g = App::Arcanum->new(paths => [], overrides => {});
     $g->{config_dir} = $tmpdir;
 
     my @plugin_dets = $g->_build_plugin_detectors($cfg);
@@ -464,7 +464,7 @@ PLUGIN
 
 {
     # The echo_plugin emits type=email_address; framework_tags should be set
-    my $det = PII::Detector::Plugin->new(
+    my $det = App::Arcanum::Detector::Plugin->new(
         config      => {},
         plugin_name => 'echo_plugin',
         plugin_cfg  => { enabled => 1 },

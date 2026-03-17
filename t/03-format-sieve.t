@@ -2,12 +2,12 @@
 use strict; use warnings;
 use FindBin qw($RealBin); use lib "$RealBin/../lib";
 use Test::More;
-use PII::Format::Sieve;
+use App::Arcanum::Format::Sieve;
 
 my $FIXTURES = "$RealBin/fixtures";
 
 sub mk {
-    PII::Format::Sieve->new(config => {
+    App::Arcanum::Format::Sieve->new(config => {
         remediation => { corrupt_file_action => 'plaintext' },
     });
 }

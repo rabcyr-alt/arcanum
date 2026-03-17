@@ -4,8 +4,8 @@ use FindBin qw($RealBin); use lib "$RealBin/../lib";
 use Test::More;
 use File::Temp qw(tempfile);
 
-use PII::Report::JSON;
-use PII::Report::HTML;
+use App::Arcanum::Report::JSON;
+use App::Arcanum::Report::HTML;
 
 # ── Shared fixtures ───────────────────────────────────────────────────────────
 
@@ -95,9 +95,9 @@ sub sample_scan {
     };
 }
 
-# ── PII::Report::JSON ─────────────────────────────────────────────────────────
+# ── App::Arcanum::Report::JSON ─────────────────────────────────────────────────────────
 
-my $jrpt = PII::Report::JSON->new(config => {});
+my $jrpt = App::Arcanum::Report::JSON->new(config => {});
 ok(defined $jrpt, 'JSON report object created');
 
 my $scan = sample_scan();
@@ -159,16 +159,16 @@ my $written = $jrpt->write($scan, $tmp_path);
 is($written, $tmp_path, 'write returns path');
 ok(-s $tmp_path > 0, 'written file is non-empty');
 
-# ── PII::Report::HTML ─────────────────────────────────────────────────────────
+# ── App::Arcanum::Report::HTML ─────────────────────────────────────────────────────────
 
-my $hrpt = PII::Report::HTML->new(config => {});
+my $hrpt = App::Arcanum::Report::HTML->new(config => {});
 ok(defined $hrpt, 'HTML report object created');
 
 my $html = $hrpt->render($scan);
 ok(defined $html && length($html) > 100, 'render returns non-empty string');
 
 like($html, qr/<!DOCTYPE html>/i,      'is HTML document');
-like($html, qr/pii-guardian/,          'mentions pii-guardian');
+like($html, qr/arcanum/,          'mentions arcanum');
 like($html, qr/data\.csv/,             'mentions data.csv');
 like($html, qr/contacts\.txt/,         'mentions contacts.txt');
 like($html, qr/email_address/,         'mentions email_address type');
@@ -208,12 +208,12 @@ ok(-s $html_path > 0, 'written HTML file non-empty');
     my $empty = { scanned_paths => [], files_examined => 0,
                   file_results => [], scanned_at => time };
 
-    my $j2 = PII::Report::JSON->new(config => {})->render($empty);
+    my $j2 = App::Arcanum::Report::JSON->new(config => {})->render($empty);
     my $d2 = Cpanel::JSON::XS->new->decode($j2);
     is($d2->{summary}{total_findings}, 0, 'empty scan: 0 findings in JSON');
 
-    my $h2 = PII::Report::HTML->new(config => {})->render($empty);
-    like($h2, qr/pii-guardian/, 'empty scan: HTML still renders');
+    my $h2 = App::Arcanum::Report::HTML->new(config => {})->render($empty);
+    like($h2, qr/arcanum/, 'empty scan: HTML still renders');
 }
 
 # Tombstone flag
@@ -233,11 +233,11 @@ ok(-s $html_path > 0, 'written HTML file non-empty');
             }],
         }],
     };
-    my $h3 = PII::Report::HTML->new(config => {})->render($tombstone_scan);
+    my $h3 = App::Arcanum::Report::HTML->new(config => {})->render($tombstone_scan);
     like($h3, qr/tombstone/i, 'tombstone warning present in HTML');
 
     my $j3 = Cpanel::JSON::XS->new->decode(
-        PII::Report::JSON->new(config => {})->render($tombstone_scan)
+        App::Arcanum::Report::JSON->new(config => {})->render($tombstone_scan)
     );
     ok($j3->{files}[0]{tombstone_match}, 'tombstone_match=true in JSON');
 }

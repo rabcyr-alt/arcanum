@@ -2,11 +2,11 @@
 use strict; use warnings;
 use FindBin qw($RealBin); use lib "$RealBin/../lib";
 use Test::More;
-use PII::Detector::Phone;
+use App::Arcanum::Detector::Phone;
 
 sub mk {
     my (%extra) = @_;
-    PII::Detector::Phone->new(config => {
+    App::Arcanum::Detector::Phone->new(config => {
         default_level => 'normal',
         detectors => { phone_number => {
             enabled => 1, level => 'normal',
@@ -53,7 +53,7 @@ sub mk {
   is(scalar @f, 0, 'zip+4 not detected'); }
 
 # Disabled
-{ my $d = PII::Detector::Phone->new(config => {
+{ my $d = App::Arcanum::Detector::Phone->new(config => {
       default_level => 'normal',
       detectors => { phone_number => { enabled => 0 } },
       allowlist => { attribution_patterns => [] },

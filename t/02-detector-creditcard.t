@@ -2,11 +2,11 @@
 use strict; use warnings;
 use FindBin qw($RealBin); use lib "$RealBin/../lib";
 use Test::More;
-use PII::Detector::CreditCard;
+use App::Arcanum::Detector::CreditCard;
 
 sub mk {
     my (%extra) = @_;
-    PII::Detector::CreditCard->new(config => {
+    App::Arcanum::Detector::CreditCard->new(config => {
         default_level => 'aggressive',
         detectors => { credit_card => { enabled => 1, level => 'aggressive', require_luhn => 1, %extra } },
         allowlist => { attribution_patterns => [] },
@@ -57,7 +57,7 @@ sub mk {
   is(scalar @f, 2, 'two cards on one line'); }
 
 # ── Disabled ─────────────────────────────────────────────────────────────────
-{ my $d = PII::Detector::CreditCard->new(config => {
+{ my $d = App::Arcanum::Detector::CreditCard->new(config => {
       default_level => 'aggressive',
       detectors => { credit_card => { enabled => 0 } },
       allowlist => { attribution_patterns => [] },

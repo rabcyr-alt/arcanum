@@ -1,8 +1,8 @@
-# pii-guardian — Implementation Plan
+# arcanum — Implementation Plan
 
 ## Overview
 
-`pii-guardian` is a Perl-based CLI tool for discovering, reporting, and remediating
+`arcanum` is a Perl-based CLI tool for discovering, reporting, and remediating
 Personally Identifiable Information (PII) in files under specified filesystem paths.
 It is git-aware, archive-aware, format-aware, offline-first, and driven by a
 human-editable JSON configuration file parsed with `Cpanel::JSON::XS` in relaxed mode.
@@ -20,9 +20,9 @@ An optional fourth phase, **Compliance**, generates regulatory mapping reports.
 ## Repository Layout
 
 ```
-pii-guardian/
+arcanum/
   bin/
-    pii-guardian                 # Main entry point (Perl, shebang /usr/bin/env perl)
+    arcanum                 # Main entry point (Perl, shebang /usr/bin/env perl)
   lib/
     PII/
       Guardian.pm                # Top-level orchestrator; loads config, drives phases
@@ -144,9 +144,9 @@ Config files use JSON with `Cpanel::JSON::XS` relaxed mode, which permits:
 
 The primary config file is loaded from the first match of:
 1. Path given by `--config` CLI flag
-2. `.pii-guardian.jsonc` in the current directory
-3. `~/.config/pii-guardian/config.jsonc`
-4. `/etc/pii-guardian/config.jsonc`
+2. `.arcanum.jsonc` in the current directory
+3. `~/.config/arcanum/config.jsonc`
+4. `/etc/arcanum/config.jsonc`
 5. Built-in defaults from `config/default.jsonc`
 
 ### Annotated `default.jsonc`
@@ -404,7 +404,7 @@ The primary config file is loaded from the first match of:
     },
 
     // Quarantine directory (relative to each scan root, or absolute)
-    quarantine_dir: ".pii-guardian-quarantine",
+    quarantine_dir: ".arcanum-quarantine",
 
     // Encryption
     encryption: {
@@ -416,7 +416,7 @@ The primary config file is loaded from the first match of:
     },
 
     // Ignore-list file written to the scan root
-    ignore_file: ".pii-guardian-ignore",
+    ignore_file: ".arcanum-ignore",
   },
 
   // ── Git integration ───────────────────────────────────────────────────────
@@ -509,7 +509,7 @@ The primary config file is loaded from the first match of:
     include_retention_recommendations: true,
 
     // Tombstone file: record hashes of deleted files to detect re-appearance
-    tombstone_file: ".pii-guardian-tombstones",
+    tombstone_file: ".arcanum-tombstones",
   },
 
   // ── Scheduling (generates cron/systemd output; does not install) ──────────
@@ -580,13 +580,13 @@ of C extensions except where noted.
 
 ```
 Usage:
-  pii-guardian scan     [options] <path> [<path> ...]
-  pii-guardian report   [options]
-  pii-guardian remediate [options]
-  pii-guardian full     [options] <path> [<path> ...]   # scan + report + remediate
-  pii-guardian config   --check                         # validate config file
-  pii-guardian config   --dump                          # print merged effective config
-  pii-guardian help     [<command>]
+  arcanum scan     [options] <path> [<path> ...]
+  arcanum report   [options]
+  arcanum remediate [options]
+  arcanum full     [options] <path> [<path> ...]   # scan + report + remediate
+  arcanum config   --check                         # validate config file
+  arcanum config   --dump                          # print merged effective config
+  arcanum help     [<command>]
 
 Global options:
   --config <file>       Path to config file (JSON with relaxed mode)
@@ -789,7 +789,7 @@ if package_installed:
 Printed to STDOUT (and optionally a file). Structure:
 
 ```
-pii-guardian scan report — 2025-06-15 14:32:00
+arcanum scan report — 2025-06-15 14:32:00
 ================================================
 Paths scanned:    /home/user/projects /home/user/exports
 Files examined:   1,847
@@ -845,7 +845,7 @@ PCI-DSS Req. 3.3 — Mask PAN:              2 findings (credit card numbers)
 
 ### JSON Report (`Report::JSON.pm`)
 
-Machine-readable. Emitted to `pii-guardian-report-<timestamp>.json` in
+Machine-readable. Emitted to `arcanum-report-<timestamp>.json` in
 `report.output_dir`. Schema mirrors the Finding and FileRiskProfile objects
 above, with top-level summary statistics and a `remediation_plan` array.
 
@@ -861,7 +861,7 @@ git commands. Suitable for sharing with a compliance team.
 
 All remediation is **dry-run by default**. The `--execute` flag must be passed
 explicitly to make changes. Every action is logged to a structured audit log
-(JSON Lines format) at `.pii-guardian-audit.jsonl` in the scan root.
+(JSON Lines format) at `.arcanum-audit.jsonl` in the scan root.
 
 Audit log entry format:
 
@@ -889,7 +889,7 @@ Audit log entry format:
 Format-aware:
 
 - **CSV**: null or mask the value in flagged cells; rewrite with `Text::CSV_XS`.
-  Column order preserved. A `# Redacted by pii-guardian <ts>` comment is not
+  Column order preserved. A `# Redacted by arcanum <ts>` comment is not
   possible in CSV; append a redaction log line to the audit file only.
 - **JSON**: use a JSON-path-aware rewrite; replace values at flagged paths.
 - **YAML**: same via `YAML::XS` round-trip.
@@ -898,7 +898,7 @@ Format-aware:
 - **Spreadsheet**: rewrite via `Spreadsheet::WriteExcel` or `Excel::Writer::XLSX`.
 - Never redact binary files in place; quarantine them instead.
 
-Before any in-place edit: backup original to `<file>.pii-guardian-backup-<ts>`.
+Before any in-place edit: backup original to `<file>.arcanum-backup-<ts>`.
 After edit: verify backup matches original SHA-256; log both hashes.
 
 ### Encryption (`Remediation::Encryptor.pm`)
@@ -912,7 +912,7 @@ After edit: verify backup matches original SHA-256; log both hashes.
 
 1. Compute destination path under `quarantine_dir` mirroring source structure.
 2. `move` (not copy) the file.
-3. Write a `<original_filename>.pii-guardian-meta` sidecar JSON file containing:
+3. Write a `<original_filename>.arcanum-meta` sidecar JSON file containing:
    original path, git status, age, finding summary, recommended final action,
    quarantine timestamp.
 
@@ -1020,7 +1020,7 @@ detectors: {
 
 The tool searches for the plugin binary in:
 1. `plugins/` relative to the config file
-2. `~/.config/pii-guardian/plugins/`
+2. `~/.config/arcanum/plugins/`
 3. `$PATH`
 
 ---
@@ -1080,7 +1080,7 @@ Files under `node_modules`, `local/lib/perl5`, `.cpan`, `vendor`,
 
 ## Tombstoning
 
-On deletion (with `--execute`), write to `.pii-guardian-tombstones` (JSON Lines):
+On deletion (with `--execute`), write to `.arcanum-tombstones` (JSON Lines):
 
 ```json
 {"ts":"2025-06-15T14:32:01Z","sha256":"abc123...","path":"/abs/path","action":"delete","reason":"..."}
@@ -1141,7 +1141,7 @@ Build in this sequence to allow incremental testing at each step:
 4. **`Detector::Base.pm`** + **`Detector::Email.pm`** — first working detector; `t/02-detector-email.t`
 5. **`Format::PlainText.pm`** — run email detector on plain text files
 6. **`Report::Text.pm`** — minimal text report so results are visible
-7. **`bin/pii-guardian`** — wire up CLI; `scan` + `report` phases working end-to-end
+7. **`bin/arcanum`** — wire up CLI; `scan` + `report` phases working end-to-end
 8. Remaining detectors in priority order: `SSN` → `CreditCard` → `Phone` → `Name` → rest
 9. Format parsers in priority order: `CSV` → `JSON` → `LDIF` → `MongoDB` → `Spreadsheet` → rest
 10. **`ArchiveHandler.pm`**; `t/04-archive.t`

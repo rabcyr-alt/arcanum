@@ -3,12 +3,12 @@ use warnings;
 use ExtUtils::MakeMaker;
 
 WriteMakefile(
-    NAME             => 'PII::Guardian',
-    AUTHOR           => 'pii-guardian contributors',
-    VERSION_FROM     => 'lib/PII/Guardian.pm',
+    NAME             => 'App::Arcanum',
+    AUTHOR           => 'App::Arcanum contributors',
+    VERSION_FROM     => 'lib/App/Arcanum.pm',
     ABSTRACT         => 'Discover, report, and remediate PII in filesystem paths',
     MIN_PERL_VERSION => '5.020',
-    EXE_FILES        => ['bin/pii-guardian'],
+    EXE_FILES        => ['bin/arcanum'],
     PREREQ_PM        => {
         'Cpanel::JSON::XS'       => '4.0',
         'Path::Tiny'             => '0.100',
@@ -48,5 +48,5 @@ WriteMakefile(
         },
     },
     dist  => { COMPRESS => 'gzip -9f', SUFFIX => 'gz' },
-    clean => { FILES => 'PII-Guardian-*' },
+    clean => { FILES => 'App-Arcanum-*' },
 );

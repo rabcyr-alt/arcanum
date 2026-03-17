@@ -7,7 +7,7 @@ use lib     "$RealBin/../lib";
 
 use Test::More;
 
-use PII::Detector::Email;
+use App::Arcanum::Detector::Email;
 
 # Minimal config for most tests
 sub mk_det {
@@ -30,7 +30,7 @@ sub mk_det {
             ],
         },
     };
-    return PII::Detector::Email->new(config => $cfg);
+    return App::Arcanum::Detector::Email->new(config => $cfg);
 }
 
 # Helper: detect on a single line of text
@@ -139,7 +139,7 @@ sub detect_line {
         detectors => { email_address => { enabled => 1, level => 'relaxed' } },
         allowlist => { emails => [], email_domains => [], names => [], patterns => [], attribution_patterns => [] },
     };
-    my $det = PII::Detector::Email->new(config => $cfg);
+    my $det = App::Arcanum::Detector::Email->new(config => $cfg);
     my @f = $det->detect('alice [at] example [dot] com', file => 'test.txt');
     is(scalar @f, 0, 'obfuscated variant NOT detected at relaxed level');
 }
@@ -151,7 +151,7 @@ sub detect_line {
         detectors => { email_address => { enabled => 1, level => 'relaxed' } },
         allowlist => { emails => [], email_domains => [], names => [], patterns => [], attribution_patterns => [] },
     };
-    my $det = PII::Detector::Email->new(config => $cfg);
+    my $det = App::Arcanum::Detector::Email->new(config => $cfg);
     my @f = $det->detect('alice@example.com', file => 'test.txt');
     is(scalar @f, 1, 'standard email detected even at relaxed level');
 }
@@ -170,7 +170,7 @@ sub detect_line {
             attribution_patterns => [],
         },
     };
-    my $det = PII::Detector::Email->new(config => $cfg);
+    my $det = App::Arcanum::Detector::Email->new(config => $cfg);
     my @f = $det->detect('From: noreply@example.com', file => 'test.txt');
 
     is(scalar @f, 1,    'allowlisted email still appears in findings');
@@ -190,7 +190,7 @@ sub detect_line {
             attribution_patterns => [],
         },
     };
-    my $det = PII::Detector::Email->new(config => $cfg);
+    my $det = App::Arcanum::Detector::Email->new(config => $cfg);
     my @f = $det->detect('ops@internal.example.com and alice@external.com', file => 't.txt');
 
     my @al  = grep { $_->{allowlisted} } @f;
@@ -229,7 +229,7 @@ sub detect_line {
         detectors => { email_address => { enabled => 0 } },
         allowlist => { emails => [], email_domains => [], names => [], patterns => [], attribution_patterns => [] },
     };
-    my $det = PII::Detector::Email->new(config => $cfg);
+    my $det = App::Arcanum::Detector::Email->new(config => $cfg);
     my @f = $det->detect('alice@example.com', file => 'test.txt');
     is(scalar @f, 0, 'no findings when detector is disabled');
 }

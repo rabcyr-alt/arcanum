@@ -2,12 +2,12 @@
 use strict; use warnings;
 use FindBin qw($RealBin); use lib "$RealBin/../lib";
 use Test::More;
-use PII::Format::Mbox;
+use App::Arcanum::Format::Mbox;
 
 my $FIXTURES = "$RealBin/fixtures";
 
 sub mk {
-    PII::Format::Mbox->new(config => {
+    App::Arcanum::Format::Mbox->new(config => {
         remediation => { corrupt_file_action => 'plaintext' },
     });
 }

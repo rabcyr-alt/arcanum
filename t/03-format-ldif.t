@@ -2,12 +2,12 @@
 use strict; use warnings;
 use FindBin qw($RealBin); use lib "$RealBin/../lib";
 use Test::More;
-use PII::Format::LDIF;
+use App::Arcanum::Format::LDIF;
 
 my $FIXTURES = "$RealBin/fixtures";
 
 sub mk {
-    PII::Format::LDIF->new(config => {
+    App::Arcanum::Format::LDIF->new(config => {
         remediation => { corrupt_file_action => 'plaintext' },
     });
 }
@@ -36,7 +36,7 @@ ok((grep { $_->{text} =~ /\+12125551234/ } @tel_segs), 'phone value found');
 
 # Nonexistent file
 {
-    my $p = PII::Format::LDIF->new(config => { remediation => { corrupt_file_action => 'skip' } });
+    my $p = App::Arcanum::Format::LDIF->new(config => { remediation => { corrupt_file_action => 'skip' } });
     my @s = $p->parse('/nonexistent/file.ldif', $fi_ldif);
     is(scalar @s, 0, 'skip: nonexistent LDIF returns empty');
 }

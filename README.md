@@ -1,9 +1,9 @@
-# pii-guardian
+# arcanum
 
 A Perl CLI tool for discovering, reporting, and remediating Personally
 Identifiable Information (PII) in filesystem paths.
 
-pii-guardian is git-aware, archive-aware, format-aware, and compliance-aware.
+arcanum is git-aware, archive-aware, format-aware, and compliance-aware.
 It works entirely offline; network access is only used when notification
 back-ends are configured and explicitly enabled.
 
@@ -23,7 +23,7 @@ back-ends are configured and explicitly enabled.
 - **Tombstone tracking** — records SHA-256 of deleted files; re-flags any file
   that reappears with matching content as a critical finding
 - **Three remediation actions** — redact (replace values with `[REDACTED]`),
-  quarantine (move to `.pii-guardian-quarantine/`), or delete (with optional
+  quarantine (move to `.arcanum-quarantine/`), or delete (with optional
   secure overwrite)
 - **Three report formats** — human-readable text, machine-readable JSON, and a
   self-contained HTML report with collapsible file blocks
@@ -39,16 +39,16 @@ back-ends are configured and explicitly enabled.
 
 ```bash
 # Scan a directory and print a text report
-pii-guardian scan /home/user/exports
+arcanum scan /home/user/exports
 
 # GDPR-focused scan with verbose output
-pii-guardian full --profile gdpr --level aggressive -v /data
+arcanum full --profile gdpr --level aggressive -v /data
 
 # Validate your config file
-pii-guardian config --check
+arcanum config --check
 
 # Show effective merged configuration
-pii-guardian config --dump --profile gdpr
+arcanum config --dump --profile gdpr
 ```
 
 Default mode is always **read-only** (`--dry-run` is implicit). Nothing is
@@ -77,10 +77,10 @@ cpanm --installdeps .
 ## Usage
 
 ```
-pii-guardian scan      [options] <path> [<path> ...]
-pii-guardian full      [options] <path> [<path> ...]
-pii-guardian config    --check | --dump
-pii-guardian help
+arcanum scan      [options] <path> [<path> ...]
+arcanum full      [options] <path> [<path> ...]
+arcanum config    --check | --dump
+arcanum help
 ```
 
 ### Global options
@@ -107,9 +107,9 @@ Config files use JSON with relaxed parsing (comments, trailing commas,
 unquoted keys). The search order is:
 
 1. `--config <file>` (explicit)
-2. `.pii-guardian.jsonc` in the current directory
-3. `~/.config/pii-guardian/config.jsonc`
-4. `/etc/pii-guardian/config.jsonc`
+2. `.arcanum.jsonc` in the current directory
+3. `~/.config/arcanum/config.jsonc`
+4. `/etc/arcanum/config.jsonc`
 5. Built-in defaults
 
 The shipped `config/default.jsonc` is a fully commented reference. Copy it to
@@ -219,8 +219,8 @@ All remediation is dry-run by default. Pass `--execute` to apply changes.
 | Action | Description |
 |--------|-------------|
 | `redact` | Replace PII values in-place with `[REDACTED:<type>]` |
-| `quarantine` | Move file to `.pii-guardian-quarantine/` with metadata |
-| `delete` | Delete file; write SHA-256 to `.pii-guardian-tombstones` |
+| `quarantine` | Move file to `.arcanum-quarantine/` with metadata |
+| `delete` | Delete file; write SHA-256 to `.arcanum-tombstones` |
 | `redact+git` | Redact file and rewrite git history with `git filter-repo` |
 
 The recommended action for each file is determined automatically based on git
@@ -229,7 +229,7 @@ status, file age, PII severity, and config policy.
 ### Tombstone tracking
 
 When a file is deleted, its SHA-256 is appended to
-`.pii-guardian-tombstones` (JSON Lines) in the scan root. On the next scan,
+`.arcanum-tombstones` (JSON Lines) in the scan root. On the next scan,
 every file is hashed and checked against the tombstone index. A match emits a
 `tombstone_reappearance` finding at `severity: critical` — the previously-deleted
 file has returned (e.g. restored from backup, re-committed, or re-generated).
@@ -240,7 +240,7 @@ file has returned (e.g. restored from backup, re-committed, or re-generated).
 
 ```bash
 # Include a GDPR compliance map in the report
-pii-guardian full --profile gdpr /data
+arcanum full --profile gdpr /data
 ```
 
 The compliance map includes:
@@ -292,14 +292,14 @@ plugins: [
 
 Plugin scripts are searched in:
 1. `<config_dir>/plugins/`
-2. `~/.config/pii-guardian/plugins/`
+2. `~/.config/arcanum/plugins/`
 3. Directories on `$PATH`
 
 ---
 
 ## Security Notes
 
-- pii-guardian never phones home — no telemetry, no network access during scan
+- arcanum never phones home — no telemetry, no network access during scan
 - Critical finding values are **truncated** in reports (`41***11`); full values
   appear only in the audit log (written at mode 0600)
 - The audit log is append-only; one JSON line per action

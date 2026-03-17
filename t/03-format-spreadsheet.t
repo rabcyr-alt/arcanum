@@ -3,12 +3,12 @@ use strict; use warnings;
 use FindBin qw($RealBin); use lib "$RealBin/../lib";
 use Test::More;
 use File::Temp qw(tempdir);
-use PII::Format::Spreadsheet;
+use App::Arcanum::Format::Spreadsheet;
 
 my $tmpdir = tempdir(CLEANUP => 1);
 
 sub mk {
-    PII::Format::Spreadsheet->new(config => {
+    App::Arcanum::Format::Spreadsheet->new(config => {
         remediation => { corrupt_file_action => 'plaintext' },
     });
 }

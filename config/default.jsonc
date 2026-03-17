@@ -228,7 +228,7 @@
       pseudonym_key_file: null,
     },
 
-    quarantine_dir: ".pii-guardian-quarantine",
+    quarantine_dir: ".arcanum-quarantine",
 
     encryption: {
       gpg_key_id: null,
@@ -236,7 +236,7 @@
       encrypted_extension: ".gpg",
     },
 
-    ignore_file: ".pii-guardian-ignore",
+    ignore_file: ".arcanum-ignore",
 
     # Crash recovery: if true, preserve temp dirs on crash for resume
     preserve_on_crash: false,
@@ -314,7 +314,7 @@
     output_dir: null,
     compliance_frameworks: [],
     include_retention_recommendations: true,
-    tombstone_file: ".pii-guardian-tombstones",
+    tombstone_file: ".arcanum-tombstones",
   },
 
   # ── Scheduling (generates cron/systemd output; does not install) ──────────

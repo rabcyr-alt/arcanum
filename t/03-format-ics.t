@@ -2,12 +2,12 @@
 use strict; use warnings;
 use FindBin qw($RealBin); use lib "$RealBin/../lib";
 use Test::More;
-use PII::Format::ICS;
+use App::Arcanum::Format::ICS;
 
 my $FIXTURES = "$RealBin/fixtures";
 
 sub mk {
-    PII::Format::ICS->new(config => {
+    App::Arcanum::Format::ICS->new(config => {
         remediation => { corrupt_file_action => 'plaintext' },
     });
 }

@@ -1,5 +1,5 @@
 # Build artifacts
-^PII-Guardian-\d
+^App-Arcanum-\d
 ^Makefile$
 ^MYMETA\.(yml|json)$
 ^blib/

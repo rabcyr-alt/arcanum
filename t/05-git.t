@@ -6,7 +6,7 @@ use Test::More;
 use File::Temp qw(tempdir);
 use Path::Tiny ();
 
-use PII::Remediation::GitRewriter;
+use App::Arcanum::Remediation::GitRewriter;
 
 # ── Helper: create a minimal git repo with a tracked file ─────────────────────
 
@@ -47,7 +47,7 @@ sub make_cfg {
 
 sub make_rw {
     my ($root) = @_;
-    PII::Remediation::GitRewriter->new(config => make_cfg(), scan_root => $root);
+    App::Arcanum::Remediation::GitRewriter->new(config => make_cfg(), scan_root => $root);
 }
 
 # ── generate_plans: empty input ───────────────────────────────────────────────
@@ -185,7 +185,7 @@ sub make_rw {
 
     my $content = Path::Tiny->new($plans[0]{script_path})->slurp_utf8;
     like($content, qr/^#!/,               'script has shebang');
-    like($content, qr/pii-guardian/,      'script mentions pii-guardian');
+    like($content, qr/arcanum/,      'script mentions arcanum');
     like($content, qr/WARNING/,           'script has WARNING header');
     like($content, qr/data\.csv/,         'script references data.csv');
     like($content, qr/force-with-lease/i || qr/force/i, 'script has push instruction');

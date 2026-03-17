@@ -9,7 +9,7 @@ use File::Spec ();
 
 use Test::More;
 
-use PII::Config;
+use App::Arcanum::Config;
 
 # ── Helper: write a temp JSONC file ──────────────────────────────────────────
 sub write_jsonc {
@@ -22,7 +22,7 @@ sub write_jsonc {
 
 # ── 1. Load built-in defaults (no user config) ───────────────────────────────
 {
-    my $cfg = PII::Config->new;
+    my $cfg = App::Arcanum::Config->new;
     my $eff = $cfg->effective;
 
     ok(ref $eff eq 'HASH', 'effective() returns a hashref');
@@ -44,7 +44,7 @@ sub write_jsonc {
 }
 END
 
-    my $cfg = PII::Config->new(config_file => $path);
+    my $cfg = App::Arcanum::Config->new(config_file => $path);
     my $eff = $cfg->effective;
 
     is($eff->{default_level}, 'aggressive', 'user config overrides default_level');
@@ -54,7 +54,7 @@ END
 # ── 3. Deep merge: user config only overrides keys it specifies ──────────────
 {
     my $path = write_jsonc('{ default_level: "relaxed" }');
-    my $cfg  = PII::Config->new(config_file => $path);
+    my $cfg  = App::Arcanum::Config->new(config_file => $path);
     my $eff  = $cfg->effective;
 
     # Should keep default values for keys not specified
@@ -66,7 +66,7 @@ END
 {
     # User config has normal, gdpr profile requires aggressive for some detectors
     my $path = write_jsonc('{ default_level: "normal" }');
-    my $cfg  = PII::Config->new(config_file => $path, profile => 'gdpr');
+    my $cfg  = App::Arcanum::Config->new(config_file => $path, profile => 'gdpr');
     my $eff  = $cfg->effective;
 
     # gdpr profile enables nin_uk at aggressive
@@ -84,7 +84,7 @@ END
   },
 }
 END
-    my $cfg = PII::Config->new(config_file => $path, profile => 'server');
+    my $cfg = App::Arcanum::Config->new(config_file => $path, profile => 'server');
     my $eff = $cfg->effective;
 
     is($eff->{detectors}{ssn_us}{level}, 'aggressive',
@@ -94,7 +94,7 @@ END
 # ── 6. Validation: invalid default_level ─────────────────────────────────────
 {
     my $path = write_jsonc('{ default_level: "ultra" }');
-    my $cfg  = PII::Config->new(config_file => $path);
+    my $cfg  = App::Arcanum::Config->new(config_file => $path);
 
     eval { $cfg->check };
     like($@, qr/default_level/, 'check() reports invalid default_level');
@@ -103,7 +103,7 @@ END
 # ── 7. Validation: bad max_depth ─────────────────────────────────────────────
 {
     my $path = write_jsonc('{ scan: { max_depth: -5 } }');
-    my $cfg  = PII::Config->new(config_file => $path);
+    my $cfg  = App::Arcanum::Config->new(config_file => $path);
 
     eval { $cfg->check };
     like($@, qr/max_depth/, 'check() reports negative max_depth');
@@ -112,7 +112,7 @@ END
 # ── 8. Validation: valid config passes check ─────────────────────────────────
 {
     my $path = write_jsonc('{ default_level: "normal", scan: { max_depth: 0 } }');
-    my $cfg  = PII::Config->new(config_file => $path);
+    my $cfg  = App::Arcanum::Config->new(config_file => $path);
 
     my $ok = eval { $cfg->check };
     is($@, '', 'check() does not die for valid config');
@@ -121,7 +121,7 @@ END
 
 # ── 9. dump_json produces parseable JSON ─────────────────────────────────────
 {
-    my $cfg  = PII::Config->new;
+    my $cfg  = App::Arcanum::Config->new;
     my $json = $cfg->dump_json;
 
     like($json, qr/default_level/, 'dump_json output contains expected key');
@@ -135,7 +135,7 @@ END
 
 # ── 10. config_file not found dies with clear message ────────────────────────
 {
-    my $cfg = PII::Config->new(config_file => '/nonexistent/path/config.jsonc');
+    my $cfg = App::Arcanum::Config->new(config_file => '/nonexistent/path/config.jsonc');
     eval { $cfg->effective };
     like($@, qr/not found/i, 'missing config_file produces a useful error');
 }
@@ -143,7 +143,7 @@ END
 # ── 11. CLI overrides are applied last ───────────────────────────────────────
 {
     my $path = write_jsonc('{ default_level: "normal" }');
-    my $cfg  = PII::Config->new(
+    my $cfg  = App::Arcanum::Config->new(
         config_file => $path,
         overrides   => { default_level => 'aggressive' },
     );

@@ -1,4 +1,4 @@
-Revision history for pii-guardian
+Revision history for arcanum
 
 0.01  2026-03-16
     - Initial release implementing the full MVP feature set (plan steps 1-20).
@@ -52,13 +52,13 @@ Revision history for pii-guardian
       - Image EXIF metadata (Image::ExifTool; GPS coordinates → high severity)
 
     Tombstoning (lib/PII/Tombstone.pm):
-      - SHA-256 index built from .pii-guardian-tombstones JSON Lines files
+      - SHA-256 index built from .arcanum-tombstones JSON Lines files
       - Per-file hash check during scan; critical finding on match
       - Tombstone entry written by Deleter after each deletion
 
     Remediation (lib/PII/Remediation/):
       - Redactor: in-place value replacement for CSV, JSON, YAML, plain text
-      - Quarantine: move file to .pii-guardian-quarantine/ with JSON metadata
+      - Quarantine: move file to .arcanum-quarantine/ with JSON metadata
       - Deleter: unlink (or shred) + tombstone write; audit log entry
       - GitRewriter: git filter-repo integration for history rewriting
 
@@ -83,7 +83,7 @@ Revision history for pii-guardian
       - Profile preset overlay (gdpr, pci_dss, hipaa, server, laptop)
       - Level enforcement: profiles can only raise scanning levels
 
-    CLI (bin/pii-guardian):
+    CLI (bin/arcanum):
       - Subcommands: scan, full, config --check, config --dump, help
       - --execute flag required for any file modification
       - --profile, --level, --dry-run, --verbose, --quiet, --no-color
