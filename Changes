@@ -1,0 +1,91 @@
+Revision history for pii-guardian
+
+0.01  2026-03-16
+    - Initial release implementing the full MVP feature set (plan steps 1-20).
+
+    Scan phase:
+      - FileClassifier: git-status-aware file walker with age scoring and
+        package-manager origin detection (Path::Tiny iterator)
+      - ArchiveHandler: recursive archive traversal for .tar, .tar.gz,
+        .tar.bz2, .tar.xz, .zip, .gz with disk-space guard and nesting limit
+
+    Format parsers (lib/PII/Format/):
+      - PlainText: line-by-line plain text
+      - CSV: Text::CSV_XS with header-column PII hinting
+      - JSON: Cpanel::JSON::XS recursive key walk
+      - YAML: YAML::XS recursive walk
+      - LDIF: Net::LDAP::LDIF attribute scan
+      - MongoDB: JSON Lines / mongoexport format
+      - Spreadsheet: XLS (Spreadsheet::ParseExcel) and XLSX (ParseXLSX)
+      - ICS: Data::ICal attendee/organiser/summary/description
+      - Mbox: Mail::Box::Manager + Email::MIME headers and body parts
+      - Sieve: custom parser for email addresses in string literals
+
+    Detectors (lib/PII/Detector/):
+      - Email address (RFC 5321 + obfuscated variants)
+      - Phone number (E.164, NANP, common international)
+      - US SSN (format + range validation)
+      - Credit/debit card (Luhn + BIN prefix)
+      - Person name (given + family name lists)
+      - Physical address (street number + road type heuristic)
+      - Date of birth (multi-format with context requirement)
+      - Passport number (ICAO 9303 Machine Readable Zone)
+      - UK National Insurance Number
+      - Canadian SIN
+      - Australian Tax File Number
+      - IBAN (ISO 13616 checksum)
+      - VIN (ISO 3779)
+      - Medical record ID
+      - National ID (generic)
+      - IP address (v4 and v6)
+      - MAC address
+      - Secrets / API keys / private keys
+      - CLI-embedded credentials (--password=, --token=, env vars, PEM headers)
+      - Full email content (headers + quoted-printable body)
+      - Calendar event PII
+      - Plugin-based detector (JSON Lines IPC via IPC::Open2)
+
+    Special file handling (lib/PII/SpecialFiles.pm):
+      - Shell history files (.bash_history, .zsh_history, etc.)
+      - Editor artefacts (.swp, .swo, Vim undo files, Emacs #backup#)
+      - Credential files (id_rsa, .netrc, .pgpass, etc.)
+      - Image EXIF metadata (Image::ExifTool; GPS coordinates → high severity)
+
+    Tombstoning (lib/PII/Tombstone.pm):
+      - SHA-256 index built from .pii-guardian-tombstones JSON Lines files
+      - Per-file hash check during scan; critical finding on match
+      - Tombstone entry written by Deleter after each deletion
+
+    Remediation (lib/PII/Remediation/):
+      - Redactor: in-place value replacement for CSV, JSON, YAML, plain text
+      - Quarantine: move file to .pii-guardian-quarantine/ with JSON metadata
+      - Deleter: unlink (or shred) + tombstone write; audit log entry
+      - GitRewriter: git filter-repo integration for history rewriting
+
+    Reports (lib/PII/Report/):
+      - Text: human-readable coloured STDOUT report
+      - JSON: machine-readable with schema_version, per-framework summaries,
+        critical value truncation (41***11)
+      - HTML: self-contained single-file report with inline CSS, collapsible
+        file blocks, copy-to-clipboard git rewrite commands
+      - ComplianceMap: GDPR/PCI-DSS/HIPAA/CCPA framework tagging, RoPA skeleton,
+        retention gap analysis, data subject request lookup
+
+    Notifications (lib/PII/Notification/):
+      - Email (Net::SMTP)
+      - Webhook (HTTP::Tiny — Slack, Teams, generic)
+      - GitHub, GitLab, Bitbucket PR comment APIs
+      - Dispatcher: routes to all configured back-ends
+
+    Configuration (lib/PII/Config.pm):
+      - JSONC relaxed parsing (Cpanel::JSON::XS)
+      - Search order: --config flag, CWD, ~/.config, /etc, built-in defaults
+      - Profile preset overlay (gdpr, pci_dss, hipaa, server, laptop)
+      - Level enforcement: profiles can only raise scanning levels
+
+    CLI (bin/pii-guardian):
+      - Subcommands: scan, full, config --check, config --dump, help
+      - --execute flag required for any file modification
+      - --profile, --level, --dry-run, --verbose, --quiet, --no-color
+
+    Test suite: 853 tests across 24 test files (prove -l t/ → PASS)
