@@ -32,6 +32,15 @@ use PII::Detector::CalendarEvent;
 use PII::Detector::FullEmail;
 use PII::Detector::Secrets;
 use PII::Format::PlainText;
+use PII::Format::CSV;
+use PII::Format::JSON;
+use PII::Format::YAML;
+use PII::Format::LDIF;
+use PII::Format::MongoDB;
+use PII::Format::Spreadsheet;
+use PII::Format::ICS;
+use PII::Format::Mbox;
+use PII::Format::Sieve;
 use PII::Report::Text;
 
 our $VERSION = '0.01';
@@ -277,11 +286,22 @@ sub _build_detectors {
 }
 
 # Build format parser instances (in priority order).
+# More specific parsers must come before PlainText (the catch-all).
 sub _build_parsers {
     my ($self, $cfg) = @_;
+    my %args = (config => $cfg, logger => $self->{log});
 
     return (
-        PII::Format::PlainText->new(config => $cfg, logger => $self->{log}),
+        PII::Format::CSV->new(%args),
+        PII::Format::JSON->new(%args),
+        PII::Format::YAML->new(%args),
+        PII::Format::LDIF->new(%args),
+        PII::Format::MongoDB->new(%args),
+        PII::Format::Spreadsheet->new(%args),
+        PII::Format::ICS->new(%args),
+        PII::Format::Mbox->new(%args),
+        PII::Format::Sieve->new(%args),
+        PII::Format::PlainText->new(%args),
     );
 }
 

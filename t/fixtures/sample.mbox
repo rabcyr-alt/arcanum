@@ -1,0 +1,26 @@
+From alice@example.com Mon Jan 15 09:00:00 2024
+From: Alice Smith <alice@example.com>
+To: Bob Jones <bob@example.org>
+Subject: Project update
+Date: Mon, 15 Jan 2024 09:00:00 +0000
+Content-Type: text/plain; charset=UTF-8
+
+Hi Bob,
+
+Please call me at +12125551234 to discuss the project.
+
+Thanks,
+Alice
+
+From bob@example.org Mon Jan 15 10:00:00 2024
+From: Bob Jones <bob@example.org>
+To: Alice Smith <alice@example.com>
+Subject: Re: Project update
+Date: Mon, 15 Jan 2024 10:00:00 +0000
+Content-Type: text/plain; charset=UTF-8
+
+Hi Alice,
+
+Will call at 212-555-5678.
+
+Bob

@@ -1,0 +1,4 @@
+id,name,email,phone,notes
+1,Alice Smith,alice@example.com,+12125551234,VIP customer
+2,Bob Jones,bob@example.org,212-555-5678,Standard account
+3,Carol White,,+447911123456,No email on file

@@ -1,0 +1,15 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Test//Test//EN
+X-WR-CALNAME:Alice's Calendar
+BEGIN:VEVENT
+UID:abc123@example.com
+DTSTART:20240115T090000Z
+DTEND:20240115T100000Z
+SUMMARY:Meeting with Bob Jones
+DESCRIPTION:Discuss project with bob@example.org
+ORGANIZER:mailto:alice@example.com
+ATTENDEE:mailto:bob@example.org
+LOCATION:123 Main St, Springfield
+END:VEVENT
+END:VCALENDAR

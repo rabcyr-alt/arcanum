@@ -1,0 +1,22 @@
+dn: uid=asmith,ou=People,dc=example,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+uid: asmith
+cn: Alice Smith
+sn: Smith
+givenName: Alice
+mail: alice@example.com
+telephoneNumber: +12125551234
+homePhone: 212-555-9999
+streetAddress: 123 Main St
+l: Springfield
+st: IL
+postalCode: 62701
+
+dn: uid=bjones,ou=People,dc=example,dc=com
+objectClass: inetOrgPerson
+uid: bjones
+cn: Bob Jones
+sn: Jones
+givenName: Bob
+mail: bob@example.org
