@@ -22,9 +22,8 @@ back-ends are configured and explicitly enabled.
   image EXIF metadata
 - **Tombstone tracking** — records SHA-256 of deleted files; re-flags any file
   that reappears with matching content as a critical finding
-- **Three remediation actions** — redact (replace values with `[REDACTED]`),
-  quarantine (move to `.arcanum-quarantine/`), or delete (with optional
-  secure overwrite)
+- **Five remediation actions** — redact, quarantine, delete, git-history
+  rewrite, or GPG encrypt
 - **Three report formats** — human-readable text, machine-readable JSON, and a
   self-contained HTML report with collapsible file blocks
 - **Compliance mapping** — GDPR, PCI-DSS, HIPAA, CCPA framework tagging on
@@ -201,11 +200,11 @@ and built-in defaults; it can only raise scanning levels, never lower them.
 | IBAN | `iban` | high |
 | VIN | `vin` | low |
 | Medical record ID | `medical_id` | critical |
-| National ID (generic) | `national_id` | high |
+| National ID (generic) | `national_id_generic` | high |
 | IP address | `ip_address` | low |
 | MAC address | `mac_address` | low |
 | Secrets / API keys | `secrets` | critical |
-| CLI-embedded credentials | `cli_pii` | high |
+| CLI-embedded credentials | `command_line_pii` | high |
 | Full email (headers+body) | `full_email_content` | high |
 | Calendar event PII | `calendar_event` | medium |
 | Tombstone reappearance | `tombstone_reappearance` | critical |
@@ -222,6 +221,7 @@ All remediation is dry-run by default. Pass `--execute` to apply changes.
 | `quarantine` | Move file to `.arcanum-quarantine/` with metadata |
 | `delete` | Delete file; write SHA-256 to `.arcanum-tombstones` |
 | `redact+git` | Redact file and rewrite git history with `git filter-repo` |
+| `encrypt` | GPG-encrypt file and securely delete the plaintext original |
 
 The recommended action for each file is determined automatically based on git
 status, file age, PII severity, and config policy.

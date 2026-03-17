@@ -31,7 +31,7 @@ All four subsystems use the same pattern: an abstract `Base.pm` parent defining 
 
 1. **Detectors** (`lib/App/Arcanum/Detector/`) — 18+ detectors inheriting from `Detector::Base`. Each implements `detector_type()` returning a config key and `detect($text, %opts)` returning Finding hashrefs with `{type, value, severity, confidence, framework_tags, ...}`. External detectors supported via `Detector::Plugin` (JSON Lines IPC).
 
-2. **Format Handlers** (`lib/App/Arcanum/Format/`) — 9 parsers inheriting from `Format::Base`. Each implements `can_handle($file_info)` and `parse($path, $file_info)` returning Segment hashrefs with `{text, key_context, line, source}`. The `key_context` field (CSV column name, JSON key path) lets detectors elevate severity contextually.
+2. **Format Handlers** (`lib/App/Arcanum/Format/`) — 10 parsers inheriting from `Format::Base`. Each implements `can_handle($file_info)` and `parse($path, $file_info)` returning Segment hashrefs with `{text, key_context, line, source}`. The `key_context` field (CSV column name, JSON key path) lets detectors elevate severity contextually.
 
 3. **Remediation Actions** (`lib/App/Arcanum/Remediation/`) — 6 actions inheriting from `Remediation::Base`. All actions are gated by `is_dry_run()` (default: true). The `--execute` flag is required to modify files. Every mutation is logged to `.arcanum-audit.jsonl`.
 

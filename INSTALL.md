@@ -229,7 +229,7 @@ plugins: [
 
 ## Troubleshooting
 
-### `Can't locate PII/Guardian.pm in @INC`
+### `Can't locate App/Arcanum.pm in @INC`
 
 Run with `-Ilib` or set `PERL5LIB=lib`.
 

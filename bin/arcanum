@@ -66,8 +66,8 @@ my %dispatch = (
 my $handler = $dispatch{$subcommand}
     or die "Unknown subcommand '$subcommand'. Run 'arcanum help' for usage.\n";
 
-# Build Guardian instance
-my %guardian_args = (
+# Build Arcanum instance
+my %arcanum_args = (
     config_file => $opt{config_file},
     profile     => $opt{profile},
     verbosity   => $opt{verbosity},
@@ -76,9 +76,9 @@ my %guardian_args = (
     overrides   => _build_overrides(\%opt),
 );
 
-my $guardian = App::Arcanum->new(%guardian_args);
+my $arcanum = App::Arcanum->new(%arcanum_args);
 
-$handler->($guardian, \%opt, \@ARGV);
+$handler->($arcanum, \%opt, \@ARGV);
 
 exit 0;
 
