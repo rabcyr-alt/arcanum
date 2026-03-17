@@ -5,7 +5,7 @@ use warnings;
 use FindBin qw($RealBin);
 use lib "$RealBin/../lib";
 
-use Test::More tests => 19;
+use Test::More tests => 23;
 
 use_ok 'PII::Logger';
 use_ok 'PII::Config';
@@ -24,6 +24,10 @@ use_ok 'PII::Format::ICS';
 use_ok 'PII::Format::Mbox';
 use_ok 'PII::Format::Sieve';
 use_ok 'PII::ArchiveHandler';
+use_ok 'PII::Remediation::Base';
+use_ok 'PII::Remediation::Deleter';
+use_ok 'PII::Remediation::Redactor';
+use_ok 'PII::Remediation::Quarantine';
 use_ok 'PII::Report::Text';
 use_ok 'PII::Guardian';
 
