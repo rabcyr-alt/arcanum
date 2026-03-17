@@ -5,7 +5,7 @@ use warnings;
 use FindBin qw($RealBin);
 use lib "$RealBin/../lib";
 
-use Test::More tests => 24;
+use Test::More;
 
 use_ok 'PII::Logger';
 use_ok 'PII::Config';
@@ -29,6 +29,13 @@ use_ok 'PII::Remediation::Deleter';
 use_ok 'PII::Remediation::Redactor';
 use_ok 'PII::Remediation::Quarantine';
 use_ok 'PII::Remediation::GitRewriter';
+use_ok 'PII::Notification::Base';
+use_ok 'PII::Notification::Email';
+use_ok 'PII::Notification::Webhook';
+use_ok 'PII::Notification::GitHub';
+use_ok 'PII::Notification::GitLab';
+use_ok 'PII::Notification::Bitbucket';
+use_ok 'PII::Notification::Dispatcher';
 use_ok 'PII::Report::Text';
 use_ok 'PII::Guardian';
 
