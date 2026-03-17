@@ -738,7 +738,55 @@ SKIP: {
     ok(length $output > 0, 'run_report: text output is non-empty');
 }
 
-# ── 29. Guardian::run_report — unknown format dies cleanly ────────────────────
+# ── 29. Guardian::run_report — json format ────────────────────────────────────
+
+{
+    my $g  = make_guardian($scan7);
+    my $sr = $g->run_scan([$scan7]);
+
+    my $output = '';
+    open my $fh, '>:utf8', \$output;
+    eval { $g->run_report($sr, format => 'json', output_fh => $fh) };
+    ok(!$@,                'run_report: json format does not die');
+    ok(length $output > 0, 'run_report: json output is non-empty');
+    my $doc = eval { Cpanel::JSON::XS->new->utf8->decode($output) };
+    ok(!$@,                'run_report: json output is valid JSON');
+    ok(exists $doc->{schema_version}, 'run_report: json has schema_version');
+}
+
+# ── 30. Guardian::run_report — html format ────────────────────────────────────
+
+{
+    my $g  = make_guardian($scan7);
+    my $sr = $g->run_scan([$scan7]);
+
+    my $output = '';
+    open my $fh, '>:utf8', \$output;
+    eval { $g->run_report($sr, format => 'html', output_fh => $fh) };
+    ok(!$@,                         'run_report: html format does not die');
+    ok(length $output > 0,          'run_report: html output is non-empty');
+    like($output, qr/<!DOCTYPE html>/i, 'run_report: html output is HTML');
+}
+
+# ── 31. Guardian::run_report — json/html write to file ────────────────────────
+
+{
+    my $g  = make_guardian($scan7);
+    my $sr = $g->run_scan([$scan7]);
+
+    my $json_out = "$tmpdir/guardian_report.json";
+    my $html_out = "$tmpdir/guardian_report.html";
+
+    eval { $g->run_report($sr, format => 'json', output_file => $json_out) };
+    ok(!$@,          'run_report: json write-to-file does not die');
+    ok(-f $json_out, 'run_report: json file written');
+
+    eval { $g->run_report($sr, format => 'html', output_file => $html_out) };
+    ok(!$@,          'run_report: html write-to-file does not die');
+    ok(-f $html_out, 'run_report: html file written');
+}
+
+# ── 32. Guardian::run_report — unknown format dies cleanly ────────────────────
 
 {
     my $g  = make_guardian($scan7);

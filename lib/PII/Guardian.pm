@@ -48,6 +48,8 @@ use PII::Format::Sieve;
 use PII::ArchiveHandler;
 use PII::Remediation::GitRewriter;
 use PII::Report::Text;
+use PII::Report::JSON;
+use PII::Report::HTML;
 
 our $VERSION = '0.01';
 
@@ -257,19 +259,21 @@ sub run_scan {
 
 =head2 run_report($scan_results, %opts)
 
-Run the report phase. Writes to STDOUT (text format) by default.
+Run the report phase.
 
-    format    => 'text'  (only text supported in MVP)
-    output_fh => GLOB    filehandle to write to
+    format     => 'text' | 'json' | 'html'   (default: 'text')
+    output_fh  => GLOB    filehandle to write to (text/json only)
+    output_file => PATH   write report to file (json/html; overrides output_fh)
 
 =cut
 
 sub run_report {
     my ($self, $scan_results, %opts) = @_;
 
-    my $cfg = $self->_cfg;
-    my $fmt = $opts{format} // ($cfg->{report}{formats}[0] // 'text');
-    my $fh  = $opts{output_fh} // \*STDOUT;
+    my $cfg  = $self->_cfg;
+    my $fmt  = $opts{format} // ($cfg->{report}{formats}[0] // 'text');
+    my $fh   = $opts{output_fh} // \*STDOUT;
+    my $file = $opts{output_file};
 
     if ($fmt eq 'text') {
         my $rpt = PII::Report::Text->new(
@@ -280,8 +284,34 @@ sub run_report {
         );
         $rpt->render($scan_results);
     }
+    elsif ($fmt eq 'json') {
+        my $rpt = PII::Report::JSON->new(
+            config => $cfg,
+            logger => $self->{log},
+        );
+        if ($file) {
+            $rpt->write($scan_results, $file);
+            $self->{log}->info("JSON report written to $file");
+        }
+        else {
+            print $fh $rpt->render($scan_results);
+        }
+    }
+    elsif ($fmt eq 'html') {
+        my $rpt = PII::Report::HTML->new(
+            config => $cfg,
+            logger => $self->{log},
+        );
+        if ($file) {
+            $rpt->write($scan_results, $file);
+            $self->{log}->info("HTML report written to $file");
+        }
+        else {
+            print $fh $rpt->render($scan_results);
+        }
+    }
     else {
-        die "Report format '$fmt' not yet implemented in this version.\n";
+        die "Unknown report format '$fmt'. Supported: text, json, html\n";
     }
 }
 

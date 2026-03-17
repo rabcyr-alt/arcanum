@@ -90,8 +90,11 @@ sub cmd_scan {
     my @paths = @$args;
     my $results = $g->run_scan(\@paths);
 
-    my $fmt = $opt->{report_format} // 'text';
-    $g->run_report($results, format => $fmt);
+    my $fmt  = $opt->{report_format} // 'text';
+    my $file = $opt->{report_dir}
+        ? _report_path($opt->{report_dir}, $fmt)
+        : undef;
+    $g->run_report($results, format => $fmt, output_file => $file);
 }
 
 sub cmd_report {
@@ -107,8 +110,11 @@ sub cmd_full {
 
     my $results = $g->run_scan(\@paths);
 
-    my $fmt = $opt->{report_format} // 'text';
-    $g->run_report($results, format => $fmt);
+    my $fmt  = $opt->{report_format} // 'text';
+    my $file = $opt->{report_dir}
+        ? _report_path($opt->{report_dir}, $fmt)
+        : undef;
+    $g->run_report($results, format => $fmt, output_file => $file);
 }
 
 sub cmd_config {
@@ -148,6 +154,14 @@ sub _build_overrides {
     }
 
     return \%ov;
+}
+
+sub _report_path {
+    my ($dir, $fmt) = @_;
+    require POSIX;
+    my $ts  = POSIX::strftime('%Y%m%dT%H%M%S', localtime);
+    my $ext = $fmt eq 'html' ? 'html' : $fmt eq 'json' ? 'json' : 'txt';
+    return "$dir/pii-guardian-$ts.$ext";
 }
 
 __END__
