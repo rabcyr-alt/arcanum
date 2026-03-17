@@ -41,6 +41,7 @@ use PII::Format::Spreadsheet;
 use PII::Format::ICS;
 use PII::Format::Mbox;
 use PII::Format::Sieve;
+use PII::ArchiveHandler;
 use PII::Report::Text;
 
 our $VERSION = '0.01';
@@ -144,6 +145,7 @@ sub run_scan {
     my $classifier = PII::FileClassifier->new(config => $cfg, logger => $self->{log});
     my @detectors  = $self->_build_detectors($cfg);
     my @parsers    = $self->_build_parsers($cfg);
+    my $arc_handler = PII::ArchiveHandler->new(config => $cfg, logger => $self->{log});
 
     # Collect and classify files
     my @file_infos = $classifier->classify_paths(\@scan_paths);
@@ -153,6 +155,23 @@ sub run_scan {
     my @file_results;
     for my $fi (@file_infos) {
         next if $fi->{package_installed} && $fi->{git_status} ne 'tracked';
+
+        # Delegate archives to ArchiveHandler
+        if ($arc_handler->can_handle($fi)) {
+            my $scan_fn = sub {
+                my ($inner_fi) = @_;
+                return $self->_scan_file($inner_fi, \@parsers, \@detectors, $cfg);
+            };
+            my @arc_results = $arc_handler->scan_archive(
+                $fi, $classifier, \@parsers, \@detectors, $scan_fn,
+            );
+            for my $r (@arc_results) {
+                $r->{file_info}{recommended_action} =
+                    $self->_recommended_action($r->{file_info}, $r->{findings}, $cfg);
+            }
+            push @file_results, @arc_results;
+            next;
+        }
 
         my @findings = $self->_scan_file($fi, \@parsers, \@detectors, $cfg);
 

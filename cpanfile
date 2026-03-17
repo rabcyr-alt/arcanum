@@ -33,6 +33,10 @@ requires 'Archive::Zip';
 # Unified archive extraction facade
 requires 'Archive::Extract';
 
+# Disk free-space check for archive expansion guard
+# [SYS: dnf install perl-Filesys-Df]
+requires 'Filesys::Df';
+
 # [C] CSV/TSV parsing
 requires 'Text::CSV_XS', '>= 1.46';
 

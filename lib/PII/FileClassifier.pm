@@ -233,6 +233,13 @@ sub _walk_dir {
 # Single-file classification
 # ──────────────────────────────────────────────────────────────────────────────
 
+# Public single-file classifier — used by ArchiveHandler for extracted files.
+sub classify_file {
+    my ($self, $path_str) = @_;
+    my $path = Path::Tiny::path($path_str)->absolute;
+    return $self->_classify_file($path, 0);
+}
+
 sub _classify_file {
     my ($self, $path, $depth) = @_;
     my $cfg = $self->{config};
