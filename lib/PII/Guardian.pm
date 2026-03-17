@@ -42,6 +42,7 @@ use PII::Format::ICS;
 use PII::Format::Mbox;
 use PII::Format::Sieve;
 use PII::ArchiveHandler;
+use PII::Remediation::GitRewriter;
 use PII::Report::Text;
 
 our $VERSION = '0.01';
