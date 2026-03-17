@@ -39,6 +39,7 @@ use_ok 'PII::Notification::Dispatcher';
 use_ok 'PII::Report::Text';
 use_ok 'PII::Report::JSON';
 use_ok 'PII::Report::HTML';
+use_ok 'PII::Report::ComplianceMap';
 use_ok 'PII::Guardian';
 
 done_testing();
