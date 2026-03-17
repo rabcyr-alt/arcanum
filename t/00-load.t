@@ -43,6 +43,7 @@ use_ok 'PII::Report::ComplianceMap';
 use_ok 'PII::Detector::Plugin';
 use_ok 'PII::Detector::CommandLinePII';
 use_ok 'PII::SpecialFiles';
+use_ok 'PII::Tombstone';
 use_ok 'PII::Guardian';
 
 done_testing();

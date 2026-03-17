@@ -34,6 +34,7 @@ use PII::Detector::Secrets;
 use PII::Detector::Plugin;
 use PII::Detector::CommandLinePII;
 use PII::SpecialFiles;
+use PII::Tombstone;
 use PII::Format::PlainText;
 use PII::Format::CSV;
 use PII::Format::JSON;
@@ -156,6 +157,10 @@ sub run_scan {
     my @parsers       = $self->_build_parsers($cfg);
     my $arc_handler   = PII::ArchiveHandler->new(config => $cfg, logger => $self->{log});
     my $special_files = PII::SpecialFiles->new(config => $cfg, logger => $self->{log});
+    my $tombstone     = PII::Tombstone->new(
+        scan_roots => \@scan_paths,
+        logger     => $self->{log},
+    );
 
     # Collect and classify files
     my @file_infos = $classifier->classify_paths(\@scan_paths);
@@ -183,6 +188,27 @@ sub run_scan {
             next;
         }
 
+        # ── Tombstone check ───────────────────────────────────────────────
+        # Hash the file and look it up in the tombstone index.  If found,
+        # flag it as a critical reappearance finding AND still run the
+        # normal scan so any remaining PII is also reported.
+        my @tombstone_findings;
+        if (-f $fi->{path}) {
+            my $ts_hit = $tombstone->check_file($fi->{path});
+            if ($ts_hit) {
+                $fi->{tombstone_match} = 1;
+                $self->{log}->warn(
+                    "CRITICAL: Previously-deleted PII file has reappeared\n"
+                  . "  Path:    $fi->{path}\n"
+                  . "  Deleted: " . ($ts_hit->{ts} // '?') . "\n"
+                  . "  SHA-256: " . ($ts_hit->{sha256} // '?') . "\n"
+                  . "  Action:  Re-flagged for immediate deletion"
+                );
+                push @tombstone_findings,
+                    $tombstone->reappearance_finding($ts_hit, $fi->{path});
+            }
+        }
+
         # Check for special file handling (shell history, editor artefacts,
         # credential files, image EXIF) — may augment or replace normal scan
         my $special = $special_files->scan($fi, \@detectors);
@@ -203,6 +229,9 @@ sub run_scan {
         else {
             @findings = $self->_scan_file($fi, \@parsers, \@detectors, $cfg);
         }
+
+        # Prepend tombstone finding so it appears first in reports
+        unshift @findings, @tombstone_findings;
 
         # Determine recommended action
         $fi->{recommended_action} = $self->_recommended_action($fi, \@findings, $cfg);
