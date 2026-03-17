@@ -32,6 +32,8 @@ use PII::Detector::CalendarEvent;
 use PII::Detector::FullEmail;
 use PII::Detector::Secrets;
 use PII::Detector::Plugin;
+use PII::Detector::CommandLinePII;
+use PII::SpecialFiles;
 use PII::Format::PlainText;
 use PII::Format::CSV;
 use PII::Format::JSON;
@@ -149,10 +151,11 @@ sub run_scan {
     $self->{log}->info("Scanning " . scalar(@scan_paths) . " path(s)");
 
     # Instantiate components
-    my $classifier = PII::FileClassifier->new(config => $cfg, logger => $self->{log});
-    my @detectors  = $self->_build_detectors($cfg);
-    my @parsers    = $self->_build_parsers($cfg);
-    my $arc_handler = PII::ArchiveHandler->new(config => $cfg, logger => $self->{log});
+    my $classifier    = PII::FileClassifier->new(config => $cfg, logger => $self->{log});
+    my @detectors     = $self->_build_detectors($cfg);
+    my @parsers       = $self->_build_parsers($cfg);
+    my $arc_handler   = PII::ArchiveHandler->new(config => $cfg, logger => $self->{log});
+    my $special_files = PII::SpecialFiles->new(config => $cfg, logger => $self->{log});
 
     # Collect and classify files
     my @file_infos = $classifier->classify_paths(\@scan_paths);
@@ -180,7 +183,26 @@ sub run_scan {
             next;
         }
 
-        my @findings = $self->_scan_file($fi, \@parsers, \@detectors, $cfg);
+        # Check for special file handling (shell history, editor artefacts,
+        # credential files, image EXIF) — may augment or replace normal scan
+        my $special = $special_files->scan($fi, \@detectors);
+
+        my @findings;
+        if ($special) {
+            $fi->{special_kind} = $special->{special_kind};
+            $fi->{special_notes} = $special->{notes} // [];
+            @findings = @{ $special->{findings} // [] };
+
+            # For editor artefacts and credential files also run the normal
+            # pipeline on the text content (SpecialFiles already did it), so
+            # we only skip the normal pipeline for those that replace it.
+            unless ($special->{special_kind} eq 'image') {
+                # SpecialFiles already ran detectors; skip the normal pipeline
+            }
+        }
+        else {
+            @findings = $self->_scan_file($fi, \@parsers, \@detectors, $cfg);
+        }
 
         # Determine recommended action
         $fi->{recommended_action} = $self->_recommended_action($fi, \@findings, $cfg);
@@ -301,6 +323,7 @@ sub _build_detectors {
         PII::Detector::CalendarEvent
         PII::Detector::FullEmail
         PII::Detector::Secrets
+        PII::Detector::CommandLinePII
     );
 
     my @detectors;
