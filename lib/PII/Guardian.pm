@@ -12,6 +12,25 @@ use PII::Logger;
 use PII::Config;
 use PII::FileClassifier;
 use PII::Detector::Email;
+use PII::Detector::SSN;
+use PII::Detector::CreditCard;
+use PII::Detector::Phone;
+use PII::Detector::Name;
+use PII::Detector::IPAddress;
+use PII::Detector::MACAddress;
+use PII::Detector::DateOfBirth;
+use PII::Detector::PassportNumber;
+use PII::Detector::NIN;
+use PII::Detector::SIN;
+use PII::Detector::TFN;
+use PII::Detector::IBAN;
+use PII::Detector::VIN;
+use PII::Detector::MedicalID;
+use PII::Detector::NationalID;
+use PII::Detector::PhysicalAddress;
+use PII::Detector::CalendarEvent;
+use PII::Detector::FullEmail;
+use PII::Detector::Secrets;
 use PII::Format::PlainText;
 use PII::Report::Text;
 
@@ -222,16 +241,38 @@ sub _cfg {
     return $self->{_cfg};
 }
 
-# Build enabled detector instances.
+# Build enabled detector instances (in priority order).
 sub _build_detectors {
     my ($self, $cfg) = @_;
 
+    my @classes = qw(
+        PII::Detector::SSN
+        PII::Detector::CreditCard
+        PII::Detector::Email
+        PII::Detector::Phone
+        PII::Detector::Name
+        PII::Detector::PassportNumber
+        PII::Detector::IPAddress
+        PII::Detector::MACAddress
+        PII::Detector::DateOfBirth
+        PII::Detector::NIN
+        PII::Detector::SIN
+        PII::Detector::TFN
+        PII::Detector::IBAN
+        PII::Detector::VIN
+        PII::Detector::MedicalID
+        PII::Detector::NationalID
+        PII::Detector::PhysicalAddress
+        PII::Detector::CalendarEvent
+        PII::Detector::FullEmail
+        PII::Detector::Secrets
+    );
+
     my @detectors;
-
-    # Email detector (MVP: only one)
-    my $email_det = PII::Detector::Email->new(config => $cfg, logger => $self->{log});
-    push @detectors, $email_det if $email_det->is_enabled;
-
+    for my $class (@classes) {
+        my $det = $class->new(config => $cfg, logger => $self->{log});
+        push @detectors, $det if $det->is_enabled;
+    }
     return @detectors;
 }
 
