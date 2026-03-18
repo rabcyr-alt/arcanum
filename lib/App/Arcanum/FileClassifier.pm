@@ -71,7 +71,7 @@ my %EXT_GROUP = (
     '.ldi'    => 'data_ldif',
     '.sieve'  => 'data_sieve',
     '.siv'    => 'data_sieve',
-    '.bson'   => 'data_mongodb',
+    '.bson'   => 'binary',
     # Spreadsheet
     '.xls'    => 'spreadsheet',
     '.xlsx'   => 'spreadsheet',
@@ -102,10 +102,11 @@ my %EXT_GROUP = (
 
 # Multi-part extensions (checked before single-extension lookup)
 my %MULTI_EXT_GROUP = (
-    '.tar.gz'  => 'archive',
-    '.tar.bz2' => 'archive',
-    '.tar.xz'  => 'archive',
-    '.tar.zst' => 'archive',
+    '.tar.gz'   => 'archive',
+    '.tar.bz2'  => 'archive',
+    '.tar.xz'   => 'archive',
+    '.tar.zst'  => 'archive',
+    '.metadata.json' => 'data_mongodb',
 );
 
 # Package-manager directory patterns
