@@ -159,6 +159,22 @@ sub run_scan {
 
     $self->{log}->info("Scanning " . scalar(@scan_paths) . " path(s)");
 
+    # Ensure the quarantine directory is never scanned
+    my $q_dir_name = $cfg->{remediation}{quarantine_dir} // '.arcanum-quarantine';
+    my $q_glob     = "**/$q_dir_name/**";
+    my @scan_excl  = @{ $cfg->{scan}{exclude_globs} // [] };
+    push @scan_excl, $q_glob unless grep { $_ eq $q_glob } @scan_excl;
+    $cfg->{scan}{exclude_globs} = \@scan_excl;
+
+    # Count files already in quarantine for each scan root (for the report)
+    my $quarantined_count = 0;
+    for my $sp (@scan_paths) {
+        my $qd = Path::Tiny->new($sp)->child($q_dir_name);
+        if (-d "$qd") {
+            find({ wanted => sub { $quarantined_count++ if -f }, no_chdir => 1 }, "$qd");
+        }
+    }
+
     # Instantiate components
     my $classifier    = App::Arcanum::FileClassifier->new(config => $cfg, logger => $self->{log});
     my @detectors     = $self->_build_detectors($cfg);
@@ -256,10 +272,11 @@ sub run_scan {
         $total_findings, scalar @file_results));
 
     return {
-        scanned_paths  => \@scan_paths,
-        files_examined => scalar @file_infos,
-        file_results   => \@file_results,
-        scanned_at     => time(),
+        scanned_paths      => \@scan_paths,
+        files_examined     => scalar @file_infos,
+        file_results       => \@file_results,
+        quarantined_count  => $quarantined_count,
+        scanned_at         => time(),
     };
 }
 
@@ -288,7 +305,13 @@ sub run_report {
             color  => $self->{color},
             fh     => $fh,
         );
-        $rpt->render($scan_results);
+        if ($file) {
+            $rpt->write($scan_results, $file);
+            $self->{log}->info("Text report written to $file");
+        }
+        else {
+            $rpt->render($scan_results);
+        }
     }
     elsif ($fmt eq 'json') {
         my $rpt = App::Arcanum::Report::JSON->new(
@@ -399,6 +422,7 @@ sub run_remediate {
                 $path,
                 git_status      => $fi->{git_status},
                 age_days        => $fi->{age_days},
+                findings        => $findings,
                 finding_summary => {
                     count        => scalar(@$findings),
                     max_severity => _max_severity($findings),
@@ -442,6 +466,7 @@ sub run_remediate {
                 $archive_path,
                 git_status      => ($group[0]{file_info}{git_status} // 'unknown'),
                 age_days        => ($group[0]{file_info}{age_days}   // 0),
+                findings        => \@all_findings,
                 finding_summary => {
                     count        => scalar(@with_pii),
                     max_severity => _max_severity(\@all_findings),
@@ -494,6 +519,7 @@ sub _remediate_archive_repackage {
             $archive_path,
             git_status      => ($group->[0]{file_info}{git_status} // 'unknown'),
             age_days        => ($group->[0]{file_info}{age_days}   // 0),
+            findings        => \@all_f,
             finding_summary => {
                 count        => scalar(@with_pii),
                 max_severity => _max_severity(\@all_f),
@@ -547,6 +573,7 @@ sub _remediate_archive_repackage {
                 $inner_path,
                 git_status         => ($fi->{git_status} // 'unknown'),
                 age_days           => ($fi->{age_days}   // 0),
+                findings           => $findings,
                 finding_summary    => {
                     count        => scalar(@$findings),
                     max_severity => _max_severity($findings),

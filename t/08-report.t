@@ -6,6 +6,7 @@ use File::Temp qw(tempfile);
 
 use App::Arcanum::Report::JSON;
 use App::Arcanum::Report::HTML;
+use App::Arcanum::Report::Text;
 
 # ── Shared fixtures ───────────────────────────────────────────────────────────
 
@@ -200,6 +201,43 @@ close $fh_html;
 my $written_html = $hrpt->write($scan, $html_path);
 is($written_html, $html_path, 'write returns path');
 ok(-s $html_path > 0, 'written HTML file non-empty');
+
+# ── App::Arcanum::Report::Text ────────────────────────────────────────────────
+
+{
+    my $trpt = App::Arcanum::Report::Text->new(config => {}, color => 0);
+    ok(defined $trpt, 'Text report object created');
+
+    # write() creates a file with no ANSI escape codes
+    my ($fh_txt, $txt_path) = tempfile(SUFFIX => '.txt', UNLINK => 1);
+    close $fh_txt;
+    my $written_txt = $trpt->write(sample_scan(), $txt_path);
+    is($written_txt, $txt_path, 'Text write() returns path');
+    ok(-s $txt_path > 0, 'written text file is non-empty');
+
+    my $txt_content = do { local $/; open my $fh, '<:utf8', $txt_path or die; <$fh> };
+    unlike($txt_content, qr/\x1b\[/, 'no ANSI escape codes in text file');
+    like($txt_content,   qr/data\.csv/, 'text report mentions data.csv');
+
+    # quarantined_count = 0: no notice printed
+    my $scan_zero = sample_scan();
+    $scan_zero->{quarantined_count} = 0;
+    my ($fh_z, $path_z) = tempfile(SUFFIX => '.txt', UNLINK => 1);
+    close $fh_z;
+    $trpt->write($scan_zero, $path_z);
+    my $content_z = do { local $/; open my $fh, '<:utf8', $path_z or die; <$fh> };
+    unlike($content_z, qr/quarantined/, 'no quarantine notice when count=0');
+
+    # quarantined_count = 3: notice printed
+    my $scan_q = sample_scan();
+    $scan_q->{quarantined_count} = 3;
+    my ($fh_q, $path_q) = tempfile(SUFFIX => '.txt', UNLINK => 1);
+    close $fh_q;
+    $trpt->write($scan_q, $path_q);
+    my $content_q = do { local $/; open my $fh, '<:utf8', $path_q or die; <$fh> };
+    like($content_q, qr/3 file\(s\) are currently quarantined/, 'quarantine count notice present');
+    like($content_q, qr/\.arcanum-quarantine/,                   'quarantine dir mentioned in notice');
+}
 
 # ── Edge cases ────────────────────────────────────────────────────────────────
 

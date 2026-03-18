@@ -129,6 +129,13 @@ sub render {
     printf $fh "Paths scanned:    %s\n",
         join(', ', @{ $results->{scanned_paths} // [] }) || '(none)';
     printf $fh "Files examined:   %s\n", _commas($results->{files_examined} // 0);
+
+    if (($results->{quarantined_count} // 0) > 0) {
+        my $q_dir = $results->{quarantine_dir} // '.arcanum-quarantine';
+        printf $fh "NOTE: %s file(s) are currently quarantined in %s/ and were excluded from this scan.\n",
+            _commas($results->{quarantined_count}), $q_dir;
+    }
+
     printf $fh "Findings:         %s across %s file(s)\n",
         _commas(scalar @non_allowlist), _commas($files_with_findings);
     printf $fh "  Critical:       %s\n", _commas($sev_count{critical} // 0);
@@ -370,6 +377,28 @@ sub _display_path {
     return defined $fi->{archive_path}
         ? "$fi->{archive_path} => $fi->{inner_path}"
         : ($fi->{path} // '');
+}
+
+=head2 write($scan_results, $path)
+
+Write the text report to C<$path> (no ANSI color codes in file output).
+Returns C<$path> on success, dies on error.
+
+=cut
+
+sub write {
+    my ($self, $results, $path) = @_;
+    open my $fh, '>:utf8', $path
+        or die "Cannot write text report to $path: $!\n";
+    my $saved_fh    = $self->{fh};
+    my $saved_color = $self->{color};
+    $self->{fh}    = $fh;
+    $self->{color} = 0;    # no ANSI codes in file output
+    $self->render($results);
+    $self->{fh}    = $saved_fh;
+    $self->{color} = $saved_color;
+    close $fh;
+    return $path;
 }
 
 1;

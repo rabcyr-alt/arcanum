@@ -72,13 +72,21 @@ sub quarantine {
     my $abs_path  = Path::Tiny->new($path)->absolute;
     my $rel;
     if (defined $opts{archive_inner_path}) {
-        # Scope quarantine under archive basename to avoid temp-path collisions
+        # Scope quarantine under archive basename to avoid temp-path collisions.
+        # Sanitize inner path to strip any leading ../ components (zip-slip defence).
         my $arc_base = Path::Tiny->new($opts{archive_path} // '')->basename;
-        $rel = Path::Tiny->new($arc_base)->child($opts{archive_inner_path});
+        (my $safe_inner = $opts{archive_inner_path}) =~ s{(?:^|/)\.\.(?=/|$)}{}g;
+        $safe_inner =~ s{^/+}{};   # strip leading slashes
+        $rel = Path::Tiny->new($arc_base)->child($safe_inner);
     }
     else {
-        eval { $rel = $abs_path->relative($self->{scan_root}) };
-        $rel = $abs_path->basename if $@;
+        eval {
+            my $candidate = $abs_path->relative($self->{scan_root});
+            # relative() produces "../" when file is outside scan_root — use absolute instead
+            die "outside" if "$candidate" =~ m{^\.\./};
+            $rel = $candidate;
+        };
+        $rel = $abs_path if $@;   # full absolute path, never traverses upward
     }
 
     my $dest      = $q_dir->child("$rel");
@@ -96,6 +104,7 @@ sub quarantine {
         git_status               => $opts{git_status}   // 'unknown',
         age_days                 => $opts{age_days}      // 0,
         sha256_before            => $sha256,
+        findings                 => $opts{findings}        // [],
         finding_summary          => $opts{finding_summary} // {},
         recommended_final_action => $opts{recommended_final_action} // 'review',
     };

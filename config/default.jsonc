@@ -12,6 +12,7 @@
       "**/.cpanm/**",
       "**/venv/**",
       "**/.venv/**",
+      "**/.arcanum-quarantine/**",
     ],
     follow_symlinks: false,
     max_depth: 0, # 0 = unlimited

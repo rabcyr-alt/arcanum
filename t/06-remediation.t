@@ -372,6 +372,85 @@ sub tmproot { tempdir(CLEANUP => 1) }
     like($meta->{original_path}, qr/=>/, 'original_path uses => notation');
 }
 
+# live quarantine: meta file contains findings array
+{
+    my $root = tmproot();
+    my $f = Path::Tiny->new($root)->child('secrets.csv');
+    $f->spew_utf8("name,ssn\nAlice,123-45-6789\n");
+
+    my $cfg = live_cfg();
+    my $q = App::Arcanum::Remediation::Quarantine->new(config => $cfg, scan_root => $root);
+    my $findings = [
+        { type => 'ssn_us', value => '123-45-6789', severity => 'critical',
+          confidence => 0.99, framework_tags => ['gdpr', 'hipaa'] },
+    ];
+    my $dest = $q->quarantine("$f",
+        reason          => 'findings meta test',
+        git_status      => 'untracked',
+        age_days        => 30,
+        findings        => $findings,
+        finding_summary => { count => 1, max_severity => 'critical', types => ['ssn_us'] },
+    );
+
+    ok(defined $dest, 'quarantine with findings returns path');
+    my $meta_path = "${dest}.arcanum-meta";
+    ok(-f $meta_path, 'meta sidecar created');
+
+    my $meta = eval { Cpanel::JSON::XS->new->utf8->decode(
+        Path::Tiny->new($meta_path)->slurp_utf8
+    )};
+    ok($meta,                               'meta is valid JSON');
+    ok(ref($meta->{findings}) eq 'ARRAY',   'meta has findings array');
+    is(scalar @{$meta->{findings}}, 1,      'findings array has 1 entry');
+    is($meta->{findings}[0]{type}, 'ssn_us', 'findings[0].type = ssn_us');
+    is($meta->{findings}[0]{severity}, 'critical', 'findings[0].severity = critical');
+    ok(ref($meta->{findings}[0]{framework_tags}) eq 'ARRAY', 'framework_tags is array');
+}
+
+# quarantine path never contains ../ when source is outside scan_root
+{
+    my $root    = tmproot();
+    my $outside = tmproot();   # completely different temp dir
+
+    my $f = Path::Tiny->new($outside)->child('external.csv');
+    $f->spew_utf8("email,alice\@example.com\n");
+
+    my $cfg = live_cfg();
+    my $q = App::Arcanum::Remediation::Quarantine->new(config => $cfg, scan_root => $root);
+    my $dest = $q->quarantine("$f",
+        reason          => 'path traversal test',
+        git_status      => 'outside_repo',
+        age_days        => 0,
+        finding_summary => { count => 1, max_severity => 'high', types => ['email_address'] },
+    );
+
+    ok(defined $dest, 'quarantine of outside-root file returns path');
+    unlike($dest, qr{\.\.[\\/]}, 'quarantine destination contains no ../ traversal');
+}
+
+# archive_inner_path sanitization strips leading ../
+{
+    my $root    = tmproot();
+    my $tmp_src = tmproot();
+
+    my $inner = Path::Tiny->new($tmp_src)->child('evil.csv');
+    $inner->spew_utf8("name,email\nEvil,evil\@example.com\n");
+
+    my $q = App::Arcanum::Remediation::Quarantine->new(config => dry_cfg(), scan_root => $root);
+    my $dest = $q->quarantine("$inner",
+        reason             => 'zip-slip test',
+        git_status         => 'untracked',
+        age_days           => 0,
+        finding_summary    => { count => 1, max_severity => 'high', types => ['email_address'] },
+        archive_path       => "$root/archive.zip",
+        archive_inner_path => '../../../etc/passwd',
+    );
+
+    ok(defined $dest, 'quarantine with traversal inner_path returns path');
+    unlike($dest, qr{\.\.[\\/]}, 'sanitized inner path contains no ../');
+    like($dest, qr/archive\.zip/, 'destination still scoped under archive basename');
+}
+
 # ── Archive quarantine mode in run_remediate ──────────────────────────────────
 
 {
