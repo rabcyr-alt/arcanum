@@ -205,6 +205,15 @@
     dry_run: true, # ALWAYS default to dry-run; require --execute to act
 
     untracked_default_action: "quarantine",
+
+    # Default action for files inside a git repo but excluded by .gitignore.
+    # Defaults to untracked_default_action if not set.
+    ignored_default_action: "quarantine",
+
+    # Default action for files outside any git repository entirely.
+    # Defaults to untracked_default_action if not set.
+    external_default_action: "quarantine",
+
     tracked_default_action: "redact",
 
     deletion: {

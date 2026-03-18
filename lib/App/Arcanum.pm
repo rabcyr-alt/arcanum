@@ -530,6 +530,8 @@ sub _recommended_action {
     my $threshold  = $cfg->{scan}{age_thresholds}{$level}              // 180;
     my $dry_run    = $cfg->{remediation}{dry_run}                       // 1;
     my $unt_action = $cfg->{remediation}{untracked_default_action}     // 'quarantine';
+    my $ign_action = $cfg->{remediation}{ignored_default_action}       // $unt_action;
+    my $ext_action = $cfg->{remediation}{external_default_action}      // $unt_action;
     my $trk_action = $cfg->{remediation}{tracked_default_action}       // 'redact';
 
     my $status   = $fi->{git_status}   // 'outside_repo';
@@ -544,7 +546,7 @@ sub _recommended_action {
 
     my $max_sev = _max_severity(\@non_al);
 
-    if ($unsafe && $status eq 'untracked' && $age >= $threshold) {
+    if ($unsafe && $status ne 'tracked' && $age >= $threshold) {
         my $gpg = $cfg->{remediation}{encryption}{gpg_key_id};
         return $gpg ? 'encrypt' : 'delete';
     }
@@ -553,19 +555,20 @@ sub _recommended_action {
         return 'redact+git';
     }
 
-    if ($status eq 'untracked') {
-        my $density = @non_al / (($fi->{age_days} || 1));  # rough proxy
-        if ($age >= $threshold) {
-            return 'delete';
-        }
-        return $unt_action;
-    }
-
     if ($status eq 'tracked') {
         return $trk_action;
     }
 
-    return 'review';
+    # All non-tracked files (untracked / ignored / outside_repo) share the same
+    # age-based logic; the default action is configurable per-bucket.
+    my $default_action = $status eq 'untracked' ? $unt_action
+                       : $status eq 'ignored'   ? $ign_action
+                       :                          $ext_action;  # outside_repo + anything else
+
+    if ($age >= $threshold) {
+        return 'delete';
+    }
+    return $default_action;
 }
 
 sub _max_severity {
