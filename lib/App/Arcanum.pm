@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use utf8;
 
+use Cwd        qw();
 use POSIX      qw(strftime);
 use List::Util qw(max);
 use Try::Tiny;
@@ -46,7 +47,11 @@ use App::Arcanum::Format::ICS;
 use App::Arcanum::Format::Mbox;
 use App::Arcanum::Format::Sieve;
 use App::Arcanum::ArchiveHandler;
+use App::Arcanum::Remediation::Deleter;
+use App::Arcanum::Remediation::Encryptor;
 use App::Arcanum::Remediation::GitRewriter;
+use App::Arcanum::Remediation::Quarantine;
+use App::Arcanum::Remediation::Redactor;
 use App::Arcanum::Report::Text;
 use App::Arcanum::Report::JSON;
 use App::Arcanum::Report::HTML;
@@ -312,6 +317,85 @@ sub run_report {
     }
     else {
         die "Unknown report format '$fmt'. Supported: text, json, html\n";
+    }
+}
+
+=head2 run_remediate($scan_results)
+
+Run the remediation phase over the findings produced by C<run_scan>.
+Each file's C<recommended_action> determines which remediation class is
+invoked. This is a no-op when there are no actionable findings.
+The dry-run gate inside each remediation class enforces the C<--execute>
+requirement; without that flag nothing is modified.
+
+=cut
+
+sub run_remediate {
+    my ($self, $scan_results) = @_;
+
+    my $cfg = $self->_cfg;
+
+    my $scan_root = do {
+        my @paths = @{ $scan_results->{scanned_paths} // [] };
+        @paths ? $paths[0] : Cwd::cwd();
+    };
+
+    my %rem_args = (config => $cfg, logger => $self->{log}, scan_root => $scan_root);
+
+    my $deleter    = App::Arcanum::Remediation::Deleter->new(%rem_args);
+    my $redactor   = App::Arcanum::Remediation::Redactor->new(%rem_args);
+    my $quarantine = App::Arcanum::Remediation::Quarantine->new(%rem_args);
+    my $encryptor;
+
+    for my $entry (@{ $scan_results->{file_results} // [] }) {
+        my $fi       = $entry->{file_info};
+        my $findings = $entry->{findings} // [];
+        my $action   = $fi->{recommended_action};
+
+        next unless defined $action;
+        next if $action eq 'note';
+
+        my $path = $fi->{path};
+
+        if ($action eq 'delete') {
+            my @types = map { $_->{type} } @$findings;
+            $deleter->delete($path, finding_types => \@types, reason => 'arcanum scan');
+        }
+        elsif ($action eq 'encrypt') {
+            unless (defined $encryptor) {
+                $encryptor = try {
+                    App::Arcanum::Remediation::Encryptor->new(%rem_args);
+                }
+                catch {
+                    $self->{log}->warn("Encryptor unavailable (gpg missing?): $_");
+                    undef;
+                };
+            }
+            if ($encryptor) {
+                $encryptor->encrypt($path, reason => 'arcanum scan');
+            }
+        }
+        elsif ($action eq 'redact' || $action eq 'redact+git') {
+            $redactor->redact($path, $findings, $fi, reason => 'arcanum scan');
+        }
+        elsif ($action eq 'quarantine') {
+            my %seen;
+            my @types = grep { !$seen{$_}++ } map { $_->{type} } @$findings;
+            $quarantine->quarantine(
+                $path,
+                git_status      => $fi->{git_status},
+                age_days        => $fi->{age_days},
+                finding_summary => {
+                    count        => scalar(@$findings),
+                    max_severity => _max_severity($findings),
+                    types        => \@types,
+                },
+                reason => 'arcanum scan',
+            );
+        }
+        else {
+            $self->{log}->debug("No remediation dispatch for action '$action' on $path");
+        }
     }
 }
 

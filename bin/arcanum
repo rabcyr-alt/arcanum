@@ -115,6 +115,7 @@ sub cmd_full {
         ? _report_path($opt->{report_dir}, $fmt)
         : undef;
     $g->run_report($results, format => $fmt, output_file => $file);
+    $g->run_remediate($results);
 }
 
 sub cmd_config {
