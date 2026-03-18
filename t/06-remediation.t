@@ -3,7 +3,9 @@ use strict; use warnings;
 use FindBin qw($RealBin); use lib "$RealBin/../lib";
 use Test::More;
 use File::Temp qw(tempdir);
+use File::Temp ();
 use Path::Tiny ();
+use Cpanel::JSON::XS ();
 
 use App::Arcanum::Remediation::Base;
 use App::Arcanum::Remediation::Deleter;
@@ -304,6 +306,309 @@ sub tmproot { tempdir(CLEANUP => 1) }
     is($meta->{age_days},     90,          'meta has age_days');
     is($meta->{recommended_final_action}, 'delete', 'meta has recommended_final_action');
     ok($meta->{sha256_before},             'meta has sha256_before');
+}
+
+# ── Quarantine with archive_inner_path ────────────────────────────────────────
+
+# archive_inner_path scopes destination under archive basename
+{
+    my $root    = tmproot();
+    my $tmp_src = tmproot();
+
+    # Simulate a temp-extracted inner file
+    my $inner = Path::Tiny->new($tmp_src)->child('data.csv');
+    $inner->spew_utf8("name,email\nAlice,alice\@example.com\n");
+
+    my $q = App::Arcanum::Remediation::Quarantine->new(config => dry_cfg(), scan_root => $root);
+    my $dest = $q->quarantine("$inner",
+        reason             => 'test archive_inner_path',
+        git_status         => 'untracked',
+        age_days           => 0,
+        finding_summary    => { count => 1, max_severity => 'high', types => ['email_address'] },
+        archive_path       => "$root/backup.tar.gz",
+        archive_inner_path => 'subdir/data.csv',
+    );
+
+    ok(defined $dest, 'quarantine with archive_inner_path returns a path');
+    like($dest, qr/backup\.tar\.gz/, 'destination scoped under archive basename');
+    like($dest, qr/subdir/, 'inner sub-path preserved in quarantine destination');
+    # Destination should be scoped under archive basename, not the raw temp file path
+    unlike($dest, qr/\Q$tmp_src\E/, 'destination does not expose inner temp dir path');
+}
+
+# archive_inner_path: original_path in meta uses "archive => inner" notation
+{
+    my $root    = tmproot();
+    my $tmp_src = tmproot();
+
+    my $inner = Path::Tiny->new($tmp_src)->child('report.txt');
+    $inner->spew_utf8("SSN: 123-45-6789\n");
+
+    my $arc_path = "$root/export.tar.gz";
+
+    my $cfg = live_cfg();
+    my $q = App::Arcanum::Remediation::Quarantine->new(config => $cfg, scan_root => $root);
+    my $dest = $q->quarantine("$inner",
+        reason             => 'test meta original_path',
+        git_status         => 'untracked',
+        age_days           => 0,
+        finding_summary    => { count => 1, max_severity => 'high', types => ['ssn_us'] },
+        archive_path       => $arc_path,
+        archive_inner_path => 'report.txt',
+    );
+
+    ok(defined $dest, 'live quarantine with archive_inner_path returns path');
+    ok(-f $dest, 'quarantined inner file exists at destination');
+
+    my $meta_path = "${dest}.arcanum-meta";
+    ok(-f $meta_path, 'meta sidecar created for inner-file quarantine');
+
+    my $meta = eval { Cpanel::JSON::XS->new->utf8->decode(
+        Path::Tiny->new($meta_path)->slurp_utf8
+    )};
+    ok($meta, 'meta file is valid JSON');
+    like($meta->{original_path}, qr/export\.tar\.gz/, 'original_path includes archive name');
+    like($meta->{original_path}, qr/report\.txt/, 'original_path includes inner path');
+    like($meta->{original_path}, qr/=>/, 'original_path uses => notation');
+}
+
+# ── Archive quarantine mode in run_remediate ──────────────────────────────────
+
+{
+    use App::Arcanum;
+
+    my $root = tmproot();
+
+    # Create a fake archive file on disk
+    my $arc = Path::Tiny->new($root)->child('data.tar.gz');
+    $arc->spew_raw("fake archive content");
+
+    # Simulate a temp dir with an inner extracted file
+    my $tmpdir_obj = File::Temp->newdir(CLEANUP => 1);
+    my $inner_file = Path::Tiny->new("$tmpdir_obj")->child('inner.csv');
+    $inner_file->spew_utf8("name,email\nAlice,alice\@example.com\n");
+
+    my $g = App::Arcanum->new;
+    $g->{_cfg} = {
+        remediation => {
+            dry_run        => 1,
+            quarantine_dir => '.arcanum-quarantine',
+            archives       => { mode => 'quarantine' },
+            deletion       => { secure_overwrite => 0, secure_overwrite_for => [], shred_command => 'shred -uz' },
+            redaction      => { masks => { default => '[REDACTED]' } },
+            encryption     => { gpg_key_id => undef },
+        },
+        scan => { archives => {} },
+    };
+
+    my $scan_results = {
+        scanned_paths => [$root],
+        file_results  => [
+            {
+                file_info => {
+                    path               => "$inner_file",
+                    archive_path       => "$arc",
+                    inner_path         => 'inner.csv',
+                    _tmpdir_obj        => $tmpdir_obj,
+                    git_status         => 'untracked',
+                    age_days           => 0,
+                    recommended_action => 'quarantine',
+                },
+                findings => [
+                    { type => 'email_address', value => 'alice@example.com',
+                      severity => 'high', confidence => 0.9, framework_tags => [] },
+                ],
+            },
+        ],
+    };
+
+    $g->run_remediate($scan_results);
+
+    # Dry-run: archive file should still be on disk
+    ok(-f "$arc", 'dry-run quarantine mode: archive file not moved');
+
+    # Audit log should reference the archive path, not the inner temp path
+    my $log = Path::Tiny->new($root)->child('.arcanum-audit.jsonl');
+    ok(-f "$log", 'audit log written in archive quarantine mode');
+    my $content = $log->slurp_utf8;
+    like($content,   qr/data\.tar\.gz/, 'audit log references archive path');
+    unlike($content, qr/inner\.csv/,    'audit log does not expose inner temp path');
+}
+
+# ── .gz repackage: delete action removes the compressed file ──────────────────
+
+{
+    my $root = tmproot();
+
+    # Build a real .gz file from scratch
+    my $tmpdir_obj = File::Temp->newdir(CLEANUP => 1);
+    my $inner_file = Path::Tiny->new("$tmpdir_obj")->child('report.txt');
+    $inner_file->spew_utf8("SSN: 123-45-6789\n");
+
+    # Create the .gz on disk so quarantine/deleter can act on it
+    my $gz = Path::Tiny->new($root)->child('report.txt.gz');
+    system("gzip -c $inner_file > $gz") == 0 or BAIL_OUT("gzip not available");
+
+    my $g = App::Arcanum->new;
+    $g->{_cfg} = {
+        remediation => {
+            dry_run        => 0,
+            quarantine_dir => '.arcanum-quarantine',
+            archives       => { mode => 'repackage' },
+            deletion       => { secure_overwrite => 0, secure_overwrite_for => [], shred_command => 'shred -uz' },
+            redaction      => { masks => { default => '[REDACTED]' } },
+            encryption     => { gpg_key_id => undef },
+        },
+        scan => { archives => {} },
+    };
+
+    $g->run_remediate({
+        scanned_paths => [$root],
+        file_results  => [{
+            file_info => {
+                path               => "$inner_file",
+                archive_path       => "$gz",
+                inner_path         => 'report.txt',
+                _tmpdir_obj        => $tmpdir_obj,
+                git_status         => 'untracked',
+                age_days           => 0,
+                recommended_action => 'delete',
+            },
+            findings => [{ type => 'ssn_us', value => '123-45-6789',
+                           severity => 'high', confidence => 0.95, framework_tags => [] }],
+        }],
+    });
+
+    ok(!-f "$gz",       '.gz file deleted after inner content removed');
+    ok(!-f "$inner_file", 'inner temp file also gone (deleted by repackage)');
+
+    # tombstone written for the deleted archive
+    my $deleter_check = App::Arcanum::Remediation::Deleter->new(
+        config => $g->{_cfg}, scan_root => $root
+    );
+    my $ts = $deleter_check->load_tombstones;
+    ok(@$ts, 'tombstone written for deleted .gz archive');
+    like($ts->[0]{path}, qr/report\.txt\.gz/, 'tombstone path is the .gz archive');
+}
+
+# ── .gz repackage: redact action rewrites and recompresses the file ───────────
+
+{
+    my $root = tmproot();
+
+    my $tmpdir_obj = File::Temp->newdir(CLEANUP => 1);
+    my $inner_file = Path::Tiny->new("$tmpdir_obj")->child('data.txt');
+    $inner_file->spew_utf8("Contact alice\@example.com for info\n");
+
+    my $gz = Path::Tiny->new($root)->child('data.txt.gz');
+    system("gzip -c $inner_file > $gz") == 0 or BAIL_OUT("gzip not available");
+    my $original_gz_size = -s "$gz";
+
+    my $g = App::Arcanum->new;
+    $g->{_cfg} = {
+        remediation => {
+            dry_run        => 0,
+            quarantine_dir => '.arcanum-quarantine',
+            archives       => { mode => 'repackage' },
+            deletion       => { secure_overwrite => 0, secure_overwrite_for => [], shred_command => 'shred -uz' },
+            redaction      => { masks => { email_address => '[REDACTED-EMAIL]', default => '[REDACTED]' } },
+            encryption     => { gpg_key_id => undef },
+        },
+        scan => { archives => {} },
+    };
+
+    $g->run_remediate({
+        scanned_paths => [$root],
+        file_results  => [{
+            file_info => {
+                path               => "$inner_file",
+                archive_path       => "$gz",
+                inner_path         => 'data.txt',
+                _tmpdir_obj        => $tmpdir_obj,
+                git_status         => 'untracked',
+                age_days           => 0,
+                recommended_action => 'redact',
+                extension_group    => 'text',
+            },
+            findings => [{ type => 'email_address', value => 'alice@example.com',
+                           severity => 'high', confidence => 0.95, framework_tags => [] }],
+        }],
+    });
+
+    ok(-f "$gz", '.gz file still exists after redact+recompress');
+    ok(glob("${gz}.arcanum-backup-*"), 'backup of original .gz created before recompress');
+
+    # Decompress the new .gz and verify the email was redacted
+    my $verify_dir = tmproot();
+    system("gzip -d -c $gz > $verify_dir/out.txt") == 0
+        or BAIL_OUT("could not decompress repackaged .gz");
+    my $content = Path::Tiny->new("$verify_dir/out.txt")->slurp_utf8;
+    unlike($content, qr/alice\@example\.com/, 'email removed from recompressed .gz content');
+    like($content,   qr/REDACTED/,             'redaction marker present in recompressed .gz');
+}
+
+# ── Archive repackage mode honors dry_run ─────────────────────────────────────
+
+{
+    my $root = tmproot();
+
+    my $arc = Path::Tiny->new($root)->child('data.tar.gz');
+    $arc->spew_raw("fake archive content");
+    my $original_content = $arc->slurp_raw;
+
+    my $tmpdir_obj = File::Temp->newdir(CLEANUP => 1);
+    my $inner_file = Path::Tiny->new("$tmpdir_obj")->child('inner.csv');
+    $inner_file->spew_utf8("name,email\nAlice,alice\@example.com\n");
+
+    my $g = App::Arcanum->new;
+    $g->{_cfg} = {
+        remediation => {
+            dry_run        => 1,
+            quarantine_dir => '.arcanum-quarantine',
+            archives       => { mode => 'repackage' },
+            deletion       => { secure_overwrite => 0, secure_overwrite_for => [], shred_command => 'shred -uz' },
+            redaction      => { masks => { default => '[REDACTED]' } },
+            encryption     => { gpg_key_id => undef },
+        },
+        scan => { archives => {} },
+    };
+
+    my $scan_results = {
+        scanned_paths => [$root],
+        file_results  => [
+            {
+                file_info => {
+                    path               => "$inner_file",
+                    archive_path       => "$arc",
+                    inner_path         => 'inner.csv',
+                    _tmpdir_obj        => $tmpdir_obj,
+                    git_status         => 'untracked',
+                    age_days           => 0,
+                    recommended_action => 'delete',
+                },
+                findings => [
+                    { type => 'email_address', value => 'alice@example.com',
+                      severity => 'high', confidence => 0.9, framework_tags => [] },
+                ],
+            },
+        ],
+    };
+
+    $g->run_remediate($scan_results);
+
+    # Dry-run: archive must be untouched, inner temp file must still exist
+    is($arc->slurp_raw, $original_content, 'dry-run repackage: archive content unchanged');
+    ok(-f "$inner_file", 'dry-run repackage: inner temp file not deleted');
+    ok(!glob("${arc}.arcanum-backup-*"), 'dry-run repackage: no backup file created');
+
+    # Audit log written with dry_run=1
+    my $log = Path::Tiny->new($root)->child('.arcanum-audit.jsonl');
+    ok(-f "$log", 'dry-run repackage: audit log written');
+    my $entry = Cpanel::JSON::XS->new->utf8->decode(
+        (Path::Tiny->new("$log")->lines_utf8)[0]
+    );
+    is($entry->{action},   'repackage', 'audit log action is repackage');
+    is($entry->{dry_run},  1,           'audit log dry_run flag is 1');
 }
 
 done_testing();

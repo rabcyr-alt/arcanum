@@ -245,6 +245,15 @@
       encrypted_extension: ".gpg",
     },
 
+    # How to handle archives when remediating.
+    # "quarantine" (default) -- quarantine the whole archive file on disk.
+    # "repackage"            -- remediate inner files in the temp dir, then repack
+    #                          the archive (original is backed up first).
+    #                          Only supported for tar (all variants) and zip.
+    archives: {
+        mode: "quarantine",
+    },
+
     ignore_file: ".arcanum-ignore",
 
     # Crash recovery: if true, preserve temp dirs on crash for resume

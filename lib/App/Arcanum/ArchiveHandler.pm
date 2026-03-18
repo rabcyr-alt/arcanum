@@ -5,7 +5,7 @@ use warnings;
 use utf8;
 
 use Carp qw(croak);
-use File::Temp qw(tempdir);
+use File::Temp ();
 use File::Find qw(find);
 use Path::Tiny ();
 use Filesys::Df qw(df);
@@ -163,9 +163,9 @@ sub scan_archive {
     }
 
     # ── Extract ───────────────────────────────────────────────────────────────
-    my $tmpdir = tempdir(CLEANUP => 1);
+    my $tmpdir = File::Temp->newdir(CLEANUP => 1);
 
-    my $ok = $self->_extract($path, $tmpdir);
+    my $ok = $self->_extract($path, "$tmpdir");
     unless ($ok) {
         $self->_log_warn("Extraction failed for '$path'");
         return ();
@@ -180,7 +180,7 @@ sub scan_archive {
     find({ wanted => sub {
         return unless -f $File::Find::name;
         push @extracted, $File::Find::name;
-    }, no_chdir => 1 }, $tmpdir);
+    }, no_chdir => 1 }, "$tmpdir");
 
     for my $extracted_path (@extracted) {
         # Build a synthetic "virtual path" for reporting: archive.tar.gz/inner.csv
@@ -198,6 +198,7 @@ sub scan_archive {
         $inner_fi->{virtual_path} = $virtual_path;
         $inner_fi->{archive_path} = $top_archive;
         $inner_fi->{inner_path}   = $rel;
+        $inner_fi->{_tmpdir_obj}  = $tmpdir;   # keeps temp dir alive through remediation
 
         # Recurse into nested archives
         if ($self->can_handle($inner_fi)) {
@@ -446,6 +447,149 @@ sub _estimate_expanded {
 
     # Fallback: ratio estimate
     return $compressed_size * $max_ratio;
+}
+
+# ── Repackage (public) ───────────────────────────────────────────────────────
+
+=head2 repackage($src_dir, $dest_path)
+
+Rebuild an archive at C<$dest_path> from the files currently in C<$src_dir>.
+Dispatches to C<_repackage_tar> or C<_repackage_zip> based on the destination
+extension.  Returns 1 on success, 0 on failure.  Only tar (all gzip/bzip2
+variants) and zip are supported; other formats return 0.
+
+=cut
+
+sub repackage {
+    my ($self, $src_dir, $dest_path) = @_;
+    return $self->_repackage($src_dir, $dest_path);
+}
+
+sub _repackage {
+    my ($self, $src_dir, $dest_path) = @_;
+
+    if ($dest_path =~ /\.zip$/i) {
+        return $self->_repackage_zip($src_dir, $dest_path);
+    }
+    elsif ($dest_path =~ /\.tar(?:\.gz|\.bz2|\.xz|\.zst)?$|\.tgz$/i) {
+        return $self->_repackage_tar($src_dir, $dest_path);
+    }
+    elsif ($dest_path =~ /\.gz$/i) {
+        return $self->_repackage_gz($src_dir, $dest_path);
+    }
+    elsif ($dest_path =~ /\.bz2$/i) {
+        return $self->_repackage_bz2($src_dir, $dest_path);
+    }
+
+    $self->_log_warn("No repackager available for '$dest_path'");
+    return 0;
+}
+
+# Return all real files in $src_dir, excluding arcanum backup sidecars.
+sub _list_repackage_files {
+    my ($self, $src_dir) = @_;
+    my @files;
+    find({ wanted => sub {
+        return unless -f $File::Find::name;
+        return if $File::Find::name =~ /\.arcanum-backup-\d{14}$/;
+        push @files, $File::Find::name;
+    }, no_chdir => 1 }, $src_dir);
+    return @files;
+}
+
+sub _repackage_tar {
+    my ($self, $src_dir, $dest_path) = @_;
+
+    my $compress = 0;
+    if ($dest_path =~ /\.tar\.gz$|\.tgz$/i) {
+        $compress = Archive::Tar::COMPRESS_GZIP();
+    }
+    elsif ($dest_path =~ /\.tar\.bz2$/i) {
+        $compress = Archive::Tar::COMPRESS_BZIP2();
+    }
+    elsif ($dest_path =~ /\.tar\.(xz|zst)$/i) {
+        $self->_log_warn("Repackage: '$dest_path' uses unsupported compression ($1); falling back");
+        return 0;
+    }
+
+    my @files = $self->_list_repackage_files($src_dir);
+    my $tar = Archive::Tar->new;
+
+    if (@files) {
+        my $cwd = Path::Tiny->cwd;
+        eval {
+            chdir $src_dir or die "Cannot chdir to $src_dir: $!";
+            my @rel;
+            for my $abs (@files) {
+                (my $r = $abs) =~ s{^\Q$src_dir\E/?}{};
+                push @rel, $r;
+            }
+            $tar->add_files(@rel);
+            chdir "$cwd" or die "Cannot restore cwd: $!";
+        };
+        if ($@) {
+            eval { chdir "$cwd" };
+            $self->_log_warn("Repackage tar: add_files failed: $@");
+            return 0;
+        }
+    }
+
+    eval { $tar->write($dest_path, $compress) };
+    if ($@) {
+        $self->_log_warn("Repackage tar: write failed for '$dest_path': $@");
+        return 0;
+    }
+
+    return 1;
+}
+
+sub _repackage_zip {
+    my ($self, $src_dir, $dest_path) = @_;
+
+    my $zip = Archive::Zip->new;
+    my @files = $self->_list_repackage_files($src_dir);
+
+    for my $abs (@files) {
+        (my $rel = $abs) =~ s{^\Q$src_dir\E/?}{};
+        my $member = $zip->addFile($abs, $rel);
+        $self->_log_warn("Repackage zip: failed to add '$rel'") unless $member;
+    }
+
+    my $status = $zip->writeToFileNamed($dest_path);
+    if ($status != AZ_OK) {
+        $self->_log_warn("Repackage zip: write failed for '$dest_path': status $status");
+        return 0;
+    }
+
+    return 1;
+}
+
+sub _repackage_gz {
+    my ($self, $src_dir, $dest_path) = @_;
+
+    my @files = $self->_list_repackage_files($src_dir);
+    unless (@files == 1) {
+        $self->_log_warn(sprintf(
+            "Repackage gz: expected 1 file in '%s', found %d", $src_dir, scalar @files
+        ));
+        return 0;
+    }
+
+    return $self->_run_cmd_to_file(['gzip', '-c', $files[0]], $dest_path);
+}
+
+sub _repackage_bz2 {
+    my ($self, $src_dir, $dest_path) = @_;
+
+    my @files = $self->_list_repackage_files($src_dir);
+    unless (@files == 1) {
+        $self->_log_warn(sprintf(
+            "Repackage bz2: expected 1 file in '%s', found %d", $src_dir, scalar @files
+        ));
+        return 0;
+    }
+
+    return $self->_run_cmd_to_file(['bzip2', '-c', $files[0]], $dest_path);
 }
 
 # ── Logging ───────────────────────────────────────────────────────────────────

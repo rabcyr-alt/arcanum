@@ -71,8 +71,15 @@ sub quarantine {
     # Mirror source path structure under quarantine dir
     my $abs_path  = Path::Tiny->new($path)->absolute;
     my $rel;
-    eval { $rel = $abs_path->relative($self->{scan_root}) };
-    $rel = $abs_path->basename if $@;
+    if (defined $opts{archive_inner_path}) {
+        # Scope quarantine under archive basename to avoid temp-path collisions
+        my $arc_base = Path::Tiny->new($opts{archive_path} // '')->basename;
+        $rel = Path::Tiny->new($arc_base)->child($opts{archive_inner_path});
+    }
+    else {
+        eval { $rel = $abs_path->relative($self->{scan_root}) };
+        $rel = $abs_path->basename if $@;
+    }
 
     my $dest      = $q_dir->child("$rel");
     my $meta_path = Path::Tiny->new("${dest}.arcanum-meta");
@@ -81,7 +88,9 @@ sub quarantine {
     my $ts     = strftime('%Y-%m-%dT%H:%M:%SZ', gmtime);
 
     my $meta = {
-        original_path            => "$abs_path",
+        original_path            => defined $opts{archive_path}
+            ? "$opts{archive_path} => $opts{archive_inner_path}"
+            : "$abs_path",
         quarantine_path          => "$dest",
         quarantine_ts            => $ts,
         git_status               => $opts{git_status}   // 'unknown',
