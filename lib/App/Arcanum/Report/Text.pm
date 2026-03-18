@@ -236,7 +236,7 @@ sub _render_file_block {
 
     return unless @findings || $fi->{tombstone_match};
 
-    my $path   = $fi->{path};
+    my $path   = _display_path($fi);
     my $status = $fi->{git_status}  // 'unknown';
     my $age    = $fi->{age_days}    // 0;
     my $count  = scalar grep { !$_->{allowlisted} } @findings;
@@ -281,7 +281,7 @@ sub _render_summary_table {
     my $fh = $self->{fh};
 
     # Column widths
-    my $w_file   = max(4, map { length($_->{file_info}{path}) } @$rows);
+    my $w_file   = max(4, map { length(_display_path($_->{file_info})) } @$rows);
     $w_file      = 60 if $w_file > 60;
 
     printf $fh "%-*s  %-11s  %5s  %8s  %-16s\n",
@@ -290,7 +290,7 @@ sub _render_summary_table {
 
     for my $fr (@$rows) {
         my $fi    = $fr->{file_info};
-        my $path  = $fi->{path} // '';
+        my $path  = _display_path($fi);
         my $count = scalar grep { !$_->{allowlisted} } @{ $fr->{findings} // [] };
         next unless $count;
 
@@ -363,6 +363,13 @@ sub _shell_quote {
     my $s = shift;
     $s =~ s/'/'\\''/g;
     return "'$s'";
+}
+
+sub _display_path {
+    my ($fi) = @_;
+    return defined $fi->{archive_path}
+        ? "$fi->{archive_path} => $fi->{inner_path}"
+        : ($fi->{path} // '');
 }
 
 1;

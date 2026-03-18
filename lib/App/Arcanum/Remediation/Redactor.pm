@@ -82,11 +82,12 @@ sub redact {
     # Dry-run gate
     unless ($self->check_execute('redact', $path)) {
         $self->audit_log({
-            action       => 'redact',
-            file         => "$path",
+            action        => 'redact',
+            file          => defined $opts{archive_path} ? ($opts{inner_path} // '') : "$path",
+            (defined $opts{archive_path} ? (archive => $opts{archive_path}) : ()),
             sha256_before => $sha256_before,
             finding_count => scalar @$findings,
-            reason       => $opts{reason} // '',
+            reason        => $opts{reason} // '',
         });
         return 1;
     }
@@ -125,7 +126,8 @@ sub redact {
 
     $self->audit_log({
         action        => 'redact',
-        file          => "$path",
+        file          => defined $opts{archive_path} ? ($opts{inner_path} // '') : "$path",
+        (defined $opts{archive_path} ? (archive => $opts{archive_path}) : ()),
         backup        => $bak,
         sha256_before => $sha256_before,
         sha256_after  => $sha256_after,

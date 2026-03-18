@@ -357,9 +357,14 @@ sub run_remediate {
 
         my $path = $fi->{path};
 
+        my %arc_opts = (
+            archive_path => $fi->{archive_path},
+            inner_path   => $fi->{inner_path},
+        );
+
         if ($action eq 'delete') {
             my @types = map { $_->{type} } @$findings;
-            $deleter->delete($path, finding_types => \@types, reason => 'arcanum scan');
+            $deleter->delete($path, finding_types => \@types, reason => 'arcanum scan', %arc_opts);
         }
         elsif ($action eq 'encrypt') {
             unless (defined $encryptor) {
@@ -372,11 +377,11 @@ sub run_remediate {
                 };
             }
             if ($encryptor) {
-                $encryptor->encrypt($path, reason => 'arcanum scan');
+                $encryptor->encrypt($path, reason => 'arcanum scan', %arc_opts);
             }
         }
         elsif ($action eq 'redact' || $action eq 'redact+git') {
-            $redactor->redact($path, $findings, $fi, reason => 'arcanum scan');
+            $redactor->redact($path, $findings, $fi, reason => 'arcanum scan', %arc_opts);
         }
         elsif ($action eq 'quarantine') {
             my %seen;
@@ -391,6 +396,7 @@ sub run_remediate {
                     types        => \@types,
                 },
                 reason => 'arcanum scan',
+                %arc_opts,
             );
         }
         else {

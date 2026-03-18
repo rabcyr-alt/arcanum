@@ -119,7 +119,8 @@ C<file_results> array).
 sub scan_archive {
     my ($self, $fi, $classifier, $parsers, $detectors, $scan_fn, %opts) = @_;
 
-    my $path      = $fi->{path};
+    my $path        = $fi->{path};
+    my $top_archive = $opts{top_archive} // $fi->{path};
     my $arc_cfg   = $self->{config}{scan}{archives} // {};
     my $max_ratio = $arc_cfg->{max_expansion_ratio} // $DEFAULT_MAX_RATIO;
     my $max_bytes = $arc_cfg->{max_extracted_bytes}  // $DEFAULT_MAX_BYTES;
@@ -195,18 +196,22 @@ sub scan_archive {
         }
         $inner_fi->{path}         = $extracted_path;
         $inner_fi->{virtual_path} = $virtual_path;
+        $inner_fi->{archive_path} = $top_archive;
+        $inner_fi->{inner_path}   = $rel;
 
         # Recurse into nested archives
         if ($self->can_handle($inner_fi)) {
             my @nested = $self->scan_archive(
                 $inner_fi, $classifier, $parsers, $detectors, $scan_fn,
-                depth => $depth + 1,
+                depth       => $depth + 1,
+                top_archive => $top_archive,
             );
             # Prepend archive path to nested virtual paths
             for my $nr (@nested) {
                 my $vp = $nr->{file_info}{virtual_path} // $nr->{file_info}{path};
                 $vp =~ s{^\Q$extracted_path\E}{$virtual_path};
                 $nr->{file_info}{virtual_path} = $vp;
+                $nr->{file_info}{inner_path} = substr($vp, length($top_archive) + 1);
             }
             push @file_results, @nested;
             next;

@@ -151,8 +151,8 @@ sub _file_doc {
     $sev{ $_->{severity} // 'medium' }++ for @real;
 
     return {
-        path                => $fi->{path}               // '',
-        virtual_path        => $fi->{virtual_path}        // undef,
+        path                => defined $fi->{archive_path} ? ($fi->{inner_path} // '') : ($fi->{path} // ''),
+        archive             => $fi->{archive_path}        // undef,
         git_status          => $fi->{git_status}          // 'unknown',
         git_repo            => $fi->{git_repo}            // undef,
         age_days            => $fi->{age_days}            // 0,
@@ -217,7 +217,8 @@ sub _remediation_plan {
         my @types = do { my %s; grep { !$s{$_}++ } map { $_->{type} // () } @real };
 
         push @plan, {
-            path   => $fi->{path} // '',
+            path    => defined $fi->{archive_path} ? ($fi->{inner_path} // '') : ($fi->{path} // ''),
+            archive => $fi->{archive_path} // undef,
             action => $action,
             reason => join(', ', @reasons),
             pii_types => \@types,

@@ -98,7 +98,8 @@ sub encrypt {
     unless ($self->check_execute('encrypt', $path)) {
         $self->audit_log({
             action      => 'encrypt',
-            file        => "$path",
+            file        => defined $opts{archive_path} ? ($opts{inner_path} // '') : "$path",
+            (defined $opts{archive_path} ? (archive => $opts{archive_path}) : ()),
             destination => $enc_path,
             key_id      => $key_id,
             sha256      => $sha256,
@@ -169,7 +170,8 @@ sub encrypt {
 
     $self->audit_log({
         action      => 'encrypt',
-        file        => "$path",
+        file        => defined $opts{archive_path} ? ($opts{inner_path} // '') : "$path",
+        (defined $opts{archive_path} ? (archive => $opts{archive_path}) : ()),
         destination => $enc_path,
         key_id      => $key_id,
         sha256      => $sha256,

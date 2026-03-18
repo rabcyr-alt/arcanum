@@ -160,7 +160,9 @@ sub _file_block {
     my @real    = grep { !$_->{allowlisted} } @all;
     my @allowed = grep {  $_->{allowlisted} } @all;
 
-    my $path   = _esc($fi->{path}               // '');
+    my $path   = defined $fi->{archive_path}
+        ? _esc($fi->{archive_path}) . ' =&gt; ' . _esc($fi->{inner_path} // '')
+        : _esc($fi->{path} // '');
     my $status = _esc($fi->{git_status}          // 'unknown');
     my $age    = $fi->{age_days}                 // 0;
     my $action = _esc($fi->{recommended_action}  // 'review');
@@ -321,7 +323,9 @@ sub _remediation_table {
         my $types_str = _esc(join(', ', sort keys %types));
 
         push @rows, {
-            path   => _esc($fi->{path}              // ''),
+            path   => defined $fi->{archive_path}
+                ? _esc($fi->{archive_path}) . ' =&gt; ' . _esc($fi->{inner_path} // '')
+                : _esc($fi->{path} // ''),
             status => _esc($fi->{git_status}         // 'unknown'),
             age    => $fi->{age_days}                // 0,
             count  => scalar @real,

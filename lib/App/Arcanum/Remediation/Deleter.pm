@@ -100,7 +100,8 @@ sub delete {
     unless ($self->check_execute('delete', $path)) {
         $self->audit_log({
             action  => 'delete',
-            file    => "$path",
+            file    => defined $opts{archive_path} ? ($opts{inner_path} // '') : "$path",
+            (defined $opts{archive_path} ? (archive => $opts{archive_path}) : ()),
             sha256  => $sha256,
             secure  => $secure ? 1 : 0,
             reason  => $opts{reason} // '',
@@ -127,7 +128,8 @@ sub delete {
 
     $self->audit_log({
         action  => 'delete',
-        file    => "$path",
+        file    => defined $opts{archive_path} ? ($opts{inner_path} // '') : "$path",
+        (defined $opts{archive_path} ? (archive => $opts{archive_path}) : ()),
         sha256  => $sha256,
         secure  => $secure ? 1 : 0,
         success => $ok ? 1 : 0,

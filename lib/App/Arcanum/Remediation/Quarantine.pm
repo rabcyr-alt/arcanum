@@ -95,7 +95,8 @@ sub quarantine {
     unless ($self->check_execute('quarantine', $path)) {
         $self->audit_log({
             action      => 'quarantine',
-            file        => "$path",
+            file        => defined $opts{archive_path} ? ($opts{inner_path} // '') : "$path",
+            (defined $opts{archive_path} ? (archive => $opts{archive_path}) : ()),
             destination => "$dest",
             sha256      => $sha256,
             reason      => $opts{reason} // '',
@@ -124,7 +125,8 @@ sub quarantine {
 
     $self->audit_log({
         action      => 'quarantine',
-        file        => "$path",
+        file        => defined $opts{archive_path} ? ($opts{inner_path} // '') : "$path",
+        (defined $opts{archive_path} ? (archive => $opts{archive_path}) : ()),
         destination => "$dest",
         sha256      => $sha256,
         success     => 1,
