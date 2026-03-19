@@ -330,7 +330,7 @@
   # ── Reporting ─────────────────────────────────────────────────────────────
   report: {
     formats: ["text"],
-    output_dir: null,
+    output_dir: null, # null = default to ~/.arcanum (base dir for the scan store)
     compliance_frameworks: [],
     include_retention_recommendations: true,
     tombstone_file: ".arcanum-tombstones",

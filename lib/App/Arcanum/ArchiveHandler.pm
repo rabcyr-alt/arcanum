@@ -451,6 +451,18 @@ sub _estimate_expanded {
 
 # ── Repackage (public) ───────────────────────────────────────────────────────
 
+=head2 extract($archive_path, $dest_dir)
+
+Public wrapper around the internal extraction dispatch.  Extracts C<$archive_path>
+into the directory C<$dest_dir>.  Returns 1 on success, 0 on failure.
+
+=cut
+
+sub extract {
+    my ($self, $archive_path, $dest_dir) = @_;
+    return $self->_extract($archive_path, $dest_dir);
+}
+
 =head2 repackage($src_dir, $dest_path)
 
 Rebuild an archive at C<$dest_path> from the files currently in C<$src_dir>.

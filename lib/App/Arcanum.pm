@@ -9,6 +9,7 @@ use POSIX      qw(strftime);
 use List::Util qw(max);
 use Try::Tiny;
 use File::Find qw(find);
+use File::Temp ();
 
 use App::Arcanum::Logger;
 use App::Arcanum::Config;
@@ -373,6 +374,8 @@ sub run_remediate {
 
     my $arc_mode = ($cfg->{remediation}{archives}{mode} // 'quarantine');
 
+    my @actions;
+
     # Split results: archive-inner files vs regular files
     my (@arc_results, @reg_results);
     for my $entry (@{ $scan_results->{file_results} // [] }) {
@@ -396,7 +399,13 @@ sub run_remediate {
 
         if ($action eq 'delete') {
             my @types = map { $_->{type} } @$findings;
-            $deleter->delete($path, finding_types => \@types, reason => 'arcanum scan');
+            my $ok = $deleter->delete($path, finding_types => \@types, reason => 'arcanum scan');
+            push @actions, {
+                file    => $path,
+                action  => 'delete',
+                dry_run => $deleter->is_dry_run ? 1 : 0,
+                outcome => $deleter->is_dry_run ? 'dry_run' : ($ok ? 'success' : 'failed'),
+            };
         }
         elsif ($action eq 'encrypt') {
             unless (defined $encryptor) {
@@ -409,16 +418,28 @@ sub run_remediate {
                 };
             }
             if ($encryptor) {
-                $encryptor->encrypt($path, reason => 'arcanum scan');
+                my $ok = $encryptor->encrypt($path, reason => 'arcanum scan');
+                push @actions, {
+                    file    => $path,
+                    action  => 'encrypt',
+                    dry_run => $encryptor->is_dry_run ? 1 : 0,
+                    outcome => $encryptor->is_dry_run ? 'dry_run' : ($ok ? 'success' : 'failed'),
+                };
             }
         }
         elsif ($action eq 'redact' || $action eq 'redact+git') {
-            $redactor->redact($path, $findings, $fi, reason => 'arcanum scan');
+            my $ok = $redactor->redact($path, $findings, $fi, reason => 'arcanum scan');
+            push @actions, {
+                file    => $path,
+                action  => $action,
+                dry_run => $redactor->is_dry_run ? 1 : 0,
+                outcome => $redactor->is_dry_run ? 'dry_run' : ($ok ? 'success' : 'failed'),
+            };
         }
         elsif ($action eq 'quarantine') {
             my %seen;
             my @types = grep { !$seen{$_}++ } map { $_->{type} } @$findings;
-            $quarantine->quarantine(
+            my $ok = $quarantine->quarantine(
                 $path,
                 git_status      => $fi->{git_status},
                 age_days        => $fi->{age_days},
@@ -430,6 +451,12 @@ sub run_remediate {
                 },
                 reason => 'arcanum scan',
             );
+            push @actions, {
+                file    => $path,
+                action  => 'quarantine',
+                dry_run => $quarantine->is_dry_run ? 1 : 0,
+                outcome => $quarantine->is_dry_run ? 'dry_run' : ($ok ? 'success' : 'failed'),
+            };
         }
         else {
             $self->{log}->debug("No remediation dispatch for action '$action' on $path");
@@ -455,6 +482,7 @@ sub run_remediate {
                 redactor    => $redactor,
                 quarantine  => $quarantine,
                 rem_args    => \%rem_args,
+                actions_ref => \@actions,
             );
         }
         else {
@@ -462,7 +490,7 @@ sub run_remediate {
             my @all_findings = map { @{ $_->{findings} // [] } } @with_pii;
             my %seen;
             my @types = grep { !$seen{$_}++ } map { $_->{type} } @all_findings;
-            $quarantine->quarantine(
+            my $ok = $quarantine->quarantine(
                 $archive_path,
                 git_status      => ($group[0]{file_info}{git_status} // 'unknown'),
                 age_days        => ($group[0]{file_info}{age_days}   // 0),
@@ -474,8 +502,16 @@ sub run_remediate {
                 },
                 reason => 'arcanum scan (archive)',
             );
+            push @actions, {
+                file    => $archive_path,
+                action  => 'quarantine',
+                dry_run => $quarantine->is_dry_run ? 1 : 0,
+                outcome => $quarantine->is_dry_run ? 'dry_run' : ($ok ? 'success' : 'failed'),
+            };
         }
     }
+
+    return \@actions;
 }
 
 # Returns true for archive formats that support repackaging.
@@ -502,32 +538,64 @@ sub _remediate_archive_repackage {
     my $redactor    = $opts{redactor};
     my $quarantine  = $opts{quarantine};
     my $rem_args    = $opts{rem_args} // {};
+    my $actions_ref = $opts{actions_ref} // [];
     my $encryptor;
 
     my $tmpdir_obj  = $group->[0]{file_info}{_tmpdir_obj};
     my $tmpdir_path = defined $tmpdir_obj ? "$tmpdir_obj" : undef;
 
+    # When scan results were loaded from the store the _tmpdir_obj is gone.
+    # Re-extract the archive into a fresh temp dir so repackage can proceed.
+    my $_re_extracted_tmpdir;   # keep new tmpdir alive for the duration of this call
     unless ($tmpdir_path && -d $tmpdir_path) {
-        $self->{log}->warn(
-            "Repackage: temp dir unavailable for '$archive_path'; falling back to quarantine"
-        );
-        my @with_pii  = grep { @{ $_->{findings} // [] } } @$group;
-        my @all_f     = map  { @{ $_->{findings} // [] } } @with_pii;
-        my %seen;
-        my @types = grep { !$seen{$_}++ } map { $_->{type} } @all_f;
-        $quarantine->quarantine(
-            $archive_path,
-            git_status      => ($group->[0]{file_info}{git_status} // 'unknown'),
-            age_days        => ($group->[0]{file_info}{age_days}   // 0),
-            findings        => \@all_f,
-            finding_summary => {
-                count        => scalar(@with_pii),
-                max_severity => _max_severity(\@all_f),
-                types        => \@types,
-            },
-            reason => 'arcanum scan (archive, repackage-fallback)',
-        );
-        return;
+        if (-f $archive_path) {
+            my $new_tmpdir = File::Temp->newdir(CLEANUP => 1);
+            if ($arc_handler->extract($archive_path, "$new_tmpdir")) {
+                $_re_extracted_tmpdir = $new_tmpdir;
+                $tmpdir_path = "$new_tmpdir";
+                # Rewrite each inner file path to the new temp location
+                for my $entry (@$group) {
+                    my $inner = $entry->{file_info}{inner_path} // '';
+                    $entry->{file_info}{path} = "$new_tmpdir/$inner" if $inner;
+                }
+            }
+            else {
+                $self->{log}->warn(
+                    "Repackage: re-extraction failed for '$archive_path'; falling back to quarantine"
+                );
+            }
+        }
+        else {
+            $self->{log}->warn(
+                "Repackage: archive '$archive_path' not found; falling back to quarantine"
+            );
+        }
+
+        unless ($tmpdir_path && -d $tmpdir_path) {
+            my @with_pii  = grep { @{ $_->{findings} // [] } } @$group;
+            my @all_f     = map  { @{ $_->{findings} // [] } } @with_pii;
+            my %seen;
+            my @types = grep { !$seen{$_}++ } map { $_->{type} } @all_f;
+            my $ok = $quarantine->quarantine(
+                $archive_path,
+                git_status      => ($group->[0]{file_info}{git_status} // 'unknown'),
+                age_days        => ($group->[0]{file_info}{age_days}   // 0),
+                findings        => \@all_f,
+                finding_summary => {
+                    count        => scalar(@with_pii),
+                    max_severity => _max_severity(\@all_f),
+                    types        => \@types,
+                },
+                reason => 'arcanum scan (archive, repackage-fallback)',
+            );
+            push @$actions_ref, {
+                file    => $archive_path,
+                action  => 'quarantine',
+                dry_run => $quarantine->is_dry_run ? 1 : 0,
+                outcome => $quarantine->is_dry_run ? 'dry_run' : ($ok ? 'success' : 'failed'),
+            };
+            return;
+        }
     }
 
     # Process each inner file through its individual action
@@ -634,6 +702,12 @@ sub _remediate_archive_repackage {
         reason => 'arcanum scan (archive repackage)',
     });
     $self->{log}->info("Repackaged '$archive_path' (backup: $bak)");
+    push @$actions_ref, {
+        file    => $archive_path,
+        action  => 'repackage',
+        dry_run => 0,
+        outcome => 'success',
+    };
 
     # Release tmpdir objects to trigger cleanup
     $_->{file_info}{_tmpdir_obj} = undef for @$group;
@@ -673,6 +747,8 @@ sub config_dump {
 # ──────────────────────────────────────────────────────────────────────────────
 # Internal helpers
 # ──────────────────────────────────────────────────────────────────────────────
+
+sub cfg { $_[0]->_cfg }
 
 # Return (cached) effective config hashref.
 sub _cfg {

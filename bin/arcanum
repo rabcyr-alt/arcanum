@@ -13,8 +13,13 @@ binmode STDERR, ':encoding(UTF-8)';
 
 use Getopt::Long qw(:config no_ignore_case bundling pass_through);
 use Pod::Usage   qw(pod2usage);
+use List::Util   qw(sum0);
+use POSIX        qw(strftime);
+use Path::Tiny   ();
 
 use App::Arcanum;
+use App::Arcanum::Store;
+use App::Arcanum::Report::Text;
 
 our $VERSION = '0.01';
 
@@ -27,18 +32,19 @@ my %opt = (
 );
 
 GetOptions(
-    'config|c=s'        => \$opt{config_file},
-    'profile|p=s'       => \$opt{profile},
-    'level|l=s'         => \$opt{level},
-    'dry-run'           => sub { $opt{dry_run} = 1 },
-    'execute'           => sub { $opt{dry_run} = 0 },
-    'verbose|v+'        => \$opt{verbosity},
-    'quiet|q'           => \$opt{quiet},
-    'color!'            => \$opt{color},   # --color / --no-color
-    'report-format|f=s' => \$opt{report_format},
-    'report-dir=s'      => \$opt{report_dir},
-    'help|h'            => \$opt{help},
-    'version|V'         => \$opt{version},
+    'config|c=s'   => \$opt{config_file},
+    'profile|p=s'  => \$opt{profile},
+    'level|l=s'    => \$opt{level},
+    'dry-run'      => sub { $opt{dry_run} = 1 },
+    'execute'      => sub { $opt{dry_run} = 0 },
+    'verbose|v+'   => \$opt{verbosity},
+    'quiet|q'      => \$opt{quiet},
+    'color!'       => \$opt{color},   # --color / --no-color
+    'report-dir=s' => \$opt{report_dir},
+    'stdout'       => \$opt{stdout},
+    'html'         => \$opt{html},
+    'help|h'       => \$opt{help},
+    'version|V'    => \$opt{version},
 ) or pod2usage(2);
 
 if ($opt{version}) {
@@ -58,6 +64,7 @@ if (!$subcommand || $opt{help}) {
 my %dispatch = (
     scan      => \&cmd_scan,
     report    => \&cmd_report,
+    remediate => \&cmd_remediate,
     full      => \&cmd_full,
     config    => \&cmd_config,
     help      => sub { pod2usage(-exitval => 0, -verbose => 2) },
@@ -86,36 +93,101 @@ exit 0;
 
 sub cmd_scan {
     my ($g, $opt, $args) = @_;
+    die "scan requires at least one path\n" unless @$args;
 
-    my @paths = @$args;
-    my $results = $g->run_scan(\@paths);
+    my $store = _make_store($opt);
 
-    my $fmt  = $opt->{report_format} // 'text';
-    my $file = $opt->{report_dir}
-        ? _report_path($opt->{report_dir}, $fmt)
-        : undef;
-    $g->run_report($results, format => $fmt, output_file => $file);
+    for my $path (@$args) {
+        my $result  = $g->run_scan([$path]);
+        my $stored  = $store->save($path, $result);
+        # Derive sibling .txt path from the stored .json path
+        (my $txt_path = "$stored") =~ s/\.json$/.txt/;
+        $g->run_report($result, format => 'text', output_file => $txt_path);
+        my $nfinds  = sum0(map { scalar @{$_->{findings} // []} }
+                          @{$result->{file_results} // []});
+
+        if ($opt->{stdout}) {
+            $g->run_report($result, format => 'text', output_fh => \*STDOUT);
+        }
+        printf "Scanned %s: %d file(s), %d finding(s). Written to %s and %s\n",
+            $path, $result->{files_examined} // 0, $nfinds, $stored, $txt_path;
+    }
 }
 
 sub cmd_report {
     my ($g, $opt, $args) = @_;
+    die "report requires at least one path\n" unless @$args;
 
-    die "The 'report' subcommand requires a prior scan result. Use 'scan' or 'full' to scan and report in one step.\n";
+    my $store   = _make_store($opt);
+    my @results = _load_results($store, $args);
+    my $merged  = $store->merge(\@results);
+
+    my $base = Path::Tiny->new($store->base_dir);
+    $base->mkpath;
+    my $ts = strftime('%Y%m%dT%H%M%S', localtime);
+
+    $g->run_report($merged, format => 'json', output_file => "$base/report-${ts}.json");
+    $g->run_report($merged, format => 'text', output_file => "$base/report-${ts}.txt");
+
+    if ($opt->{stdout}) {
+        $g->run_report($merged, format => 'text', output_fh => \*STDOUT);
+    }
+    if ($opt->{html}) {
+        $g->run_report($merged, format => 'html', output_file => "$base/report-${ts}.html");
+        print "  HTML: $base/report-${ts}.html\n";
+    }
+    printf "Report: %s/report-%s.{json,txt}\n", $base, $ts;
+}
+
+sub cmd_remediate {
+    my ($g, $opt, $args) = @_;
+    die "remediate requires at least one path\n" unless @$args;
+
+    my $store   = _make_store($opt);
+    my @results = _load_results($store, $args);
+    my $merged  = $store->merge(\@results);
+    my $actions = $g->run_remediate($merged);
+
+    my $base = Path::Tiny->new($store->base_dir);
+    $base->mkpath;
+    my $ts      = strftime('%Y%m%dT%H%M%S', localtime);
+    my $dry_run = $g->cfg->{remediation}{dry_run} // 1;
+    my $stem    = $dry_run ? "remediate-dry-run-${ts}" : "remediate-${ts}";
+
+    my $rem_doc = {
+        schema_version => '1',
+        generated_at   => strftime('%Y-%m-%dT%H:%M:%SZ', gmtime),
+        dry_run        => $dry_run ? \1 : \0,
+        scan_summary   => {
+            scanned_paths  => $merged->{scanned_paths},
+            files_examined => $merged->{files_examined} // 0,
+        },
+        scan_results => $merged,
+        actions      => $actions,
+    };
+
+    _write_remediate_json("$base/${stem}.json", $rem_doc);
+    _write_remediate_text("$base/${stem}.txt",  $rem_doc, $merged, $g);
+
+    if ($opt->{stdout}) {
+        _write_remediate_text(\*STDOUT, $rem_doc, $merged, $g);
+    }
+    if ($opt->{html}) {
+        _write_remediate_html("$base/${stem}.html", $rem_doc, $merged, $g);
+        print "  HTML: $base/${stem}.html\n";
+    }
+    printf "Remediation report: %s/%s.{json,txt}\n", $base, $stem;
+    if ($dry_run) {
+        warn "NOTE: dry-run mode — no files were modified. Pass --execute to apply changes.\n";
+    }
 }
 
 sub cmd_full {
     my ($g, $opt, $args) = @_;
-
-    my @paths = @$args;
-
-    my $results = $g->run_scan(\@paths);
-
-    my $fmt  = $opt->{report_format} // 'text';
-    my $file = $opt->{report_dir}
-        ? _report_path($opt->{report_dir}, $fmt)
-        : undef;
-    $g->run_report($results, format => $fmt, output_file => $file);
-    $g->run_remediate($results);
+    die "full requires at least one path\n" unless @$args;
+    cmd_scan($g, $opt, $args);
+    cmd_report($g, $opt, $args);
+    cmd_remediate($g, $opt, $args);
 }
 
 sub cmd_config {
@@ -136,6 +208,31 @@ sub cmd_config {
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+sub _make_store {
+    my ($opt) = @_;
+    my %args;
+    $args{base_dir} = $opt->{report_dir} if defined $opt->{report_dir};
+    return App::Arcanum::Store->new(%args);
+}
+
+# Load the latest per-path scan result for each path; warn about stale files.
+sub _load_results {
+    my ($store, $paths) = @_;
+    my @results;
+    for my $path (@$paths) {
+        my $latest = $store->latest_result($path)
+            or die "No scan result for '$path'. Run: arcanum scan $path\n";
+        my $stale = $store->stale_results($path);
+        if (@$stale) {
+            warn sprintf("WARNING: %d stale scan file(s) for '%s' may contain PII — consider removing:\n",
+                         scalar @$stale, $path);
+            warn "  $_\n" for @$stale;
+        }
+        push @results, $store->load($latest);
+    }
+    return @results;
+}
+
 # Build config overrides from CLI flags.
 sub _build_overrides {
     my ($opt) = @_;
@@ -147,9 +244,6 @@ sub _build_overrides {
     $ov{remediation}{dry_run} = $opt->{dry_run}
         if defined $opt->{dry_run};
 
-    if (defined $opt->{report_format}) {
-        $ov{report}{formats} = [ $opt->{report_format} ];
-    }
     if (defined $opt->{report_dir}) {
         $ov{report}{output_dir} = $opt->{report_dir};
     }
@@ -157,12 +251,95 @@ sub _build_overrides {
     return \%ov;
 }
 
-sub _report_path {
-    my ($dir, $fmt) = @_;
-    require POSIX;
-    my $ts  = POSIX::strftime('%Y%m%dT%H%M%S', localtime);
-    my $ext = $fmt eq 'html' ? 'html' : $fmt eq 'json' ? 'json' : 'txt';
-    return "$dir/arcanum-$ts.$ext";
+# Write remediation JSON report to $path.
+sub _write_remediate_json {
+    my ($path, $doc) = @_;
+    require Cpanel::JSON::XS;
+    my $json = Cpanel::JSON::XS->new->utf8->canonical->pretty->encode($doc);
+    Path::Tiny->new($path)->spew_utf8($json);
+}
+
+# Write remediation text report.  $dest may be a filename string or a filehandle.
+sub _write_remediate_text {
+    my ($dest, $doc, $merged, $g) = @_;
+
+    my $is_fh = ref $dest;
+    my ($fh, $tmp_path);
+
+    if ($is_fh) {
+        $fh = $dest;
+    }
+    else {
+        open $fh, '>:encoding(UTF-8)', $dest
+            or die "Cannot write '$dest': $!\n";
+    }
+
+    # Render the scan report section via Report::Text
+    my $rpt = App::Arcanum::Report::Text->new(
+        config => $g->cfg,
+        logger => undef,
+        color  => 0,
+        fh     => $fh,
+    );
+    $rpt->render($merged);
+
+    # Append remediation actions section
+    my $actions = $doc->{actions} // [];
+    print $fh "\n── Remediation Actions ──\n";
+    if (@$actions) {
+        printf $fh "%-60s  %-12s  %s\n", 'File', 'Action', 'Outcome';
+        print  $fh '-' x 90 . "\n";
+        for my $a (@$actions) {
+            printf $fh "%-60s  %-12s  %s\n",
+                $a->{file}    // '?',
+                $a->{action}  // '?',
+                $a->{outcome} // '?';
+        }
+    }
+    else {
+        print $fh "No remediation actions taken.\n";
+    }
+
+    close $fh unless $is_fh;
+}
+
+# Write remediation HTML report to $path.
+sub _write_remediate_html {
+    my ($path, $doc, $merged, $g) = @_;
+
+    require App::Arcanum::Report::HTML;
+    my $rpt = App::Arcanum::Report::HTML->new(
+        config => $g->cfg,
+        logger => undef,
+    );
+    my $scan_html = $rpt->render($merged);
+
+    my $actions = $doc->{actions} // [];
+    my $rows = '';
+    for my $a (@$actions) {
+        my $f = _html_esc($a->{file}    // '');
+        my $c = _html_esc($a->{action}  // '');
+        my $o = _html_esc($a->{outcome} // '');
+        $rows .= "<tr><td>$f</td><td>$c</td><td>$o</td></tr>\n";
+    }
+    my $table = $rows
+        ? "<table><thead><tr><th>File</th><th>Action</th><th>Outcome</th></tr></thead><tbody>$rows</tbody></table>"
+        : '<p>No remediation actions taken.</p>';
+
+    # Inject actions section before closing </body>
+    my $actions_section = "<h2>Remediation Actions</h2>$table";
+    $scan_html =~ s{</body>}{$actions_section\n</body>}i
+        or $scan_html .= $actions_section;
+
+    Path::Tiny->new($path)->spew_utf8($scan_html);
+}
+
+sub _html_esc {
+    my ($s) = @_;
+    $s =~ s/&/&amp;/g;
+    $s =~ s/</&lt;/g;
+    $s =~ s/>/&gt;/g;
+    return $s;
 }
 
 __END__
@@ -173,12 +350,13 @@ arcanum - Discover, report, and remediate PII in filesystem paths
 
 =head1 SYNOPSIS
 
-  arcanum scan     [options] <path> [<path> ...]
-  arcanum report   [options]
-  arcanum full     [options] <path> [<path> ...]
-  arcanum config   --check
-  arcanum config   --dump
-  arcanum help     [<command>]
+  arcanum scan      [options] <path> [<path> ...]
+  arcanum report    [options] <path> [<path> ...]
+  arcanum remediate [options] <path> [<path> ...]
+  arcanum full      [options] <path> [<path> ...]
+  arcanum config    --check
+  arcanum config    --dump
+  arcanum help      [<command>]
 
 =head1 GLOBAL OPTIONS
 
@@ -190,8 +368,9 @@ arcanum - Discover, report, and remediate PII in filesystem paths
   -v, --verbose            Increase log verbosity (repeatable: -v -vv)
   -q, --quiet              Suppress all output except errors
   --color / --no-color     Enable or disable ANSI colour output
-  --report-format <fmt>    Report format: text (json and html coming soon)
-  --report-dir <dir>       Directory to write report files
+  --report-dir <dir>       Base directory for the scan store (default: ~/.arcanum)
+  --stdout                 Also print the text report to STDOUT
+  --html                   Also write an HTML report file
   -h, --help               Show this help
   -V, --version            Show version
 
@@ -199,14 +378,32 @@ arcanum - Discover, report, and remediate PII in filesystem paths
 
 =head2 scan
 
-Walk the given paths and detect PII, then print the full report.
-Equivalent to C<full> — both subcommands scan and immediately report.
+Walk the given paths, detect PII, and save per-path raw scan results to the
+store under C<~/.arcanum> (or C<--report-dir>).
 
   arcanum scan /home/user/exports /home/user/projects
 
+=head2 report
+
+Load the most recent scan results for each given path from the store and write
+consolidated JSON and text (and optionally HTML) report files.  Requires a
+prior C<scan> run.
+
+  arcanum report /home/user/exports
+  arcanum report --html --stdout /home/user/exports
+
+=head2 remediate
+
+Load the most recent scan results and run the remediation phase, writing a
+remediation report.  Requires a prior C<scan> run.  Use C<--execute> to
+actually modify files (dry-run by default).
+
+  arcanum remediate /home/user/exports
+  arcanum remediate --execute /home/user/exports
+
 =head2 full
 
-Scan and immediately produce a report (most common usage).
+Chain C<scan>, C<report>, and C<remediate> in sequence.
 
   arcanum full /home/user/exports
   arcanum full --profile gdpr --level aggressive /data
@@ -221,11 +418,20 @@ Print the fully merged effective configuration as pretty JSON.
 
 =head1 EXAMPLES
 
-  # Quick scan of a directory
-  arcanum full /var/exports
+  # Scan a directory and save results
+  arcanum scan /var/exports
 
-  # GDPR-focused aggressive scan with verbose output
-  arcanum full --profile gdpr --level aggressive -v /home/user
+  # Generate reports from a previous scan
+  arcanum report /var/exports
+
+  # Remediate (dry-run by default)
+  arcanum remediate /var/exports
+
+  # Remediate for real
+  arcanum remediate --execute /var/exports
+
+  # Full pipeline with GDPR profile, verbose, print to STDOUT
+  arcanum full --profile gdpr --level aggressive -v --stdout /home/user
 
   # Validate your config file
   arcanum config --check
@@ -243,6 +449,10 @@ Search order:
   3. ~/.config/arcanum/config.jsonc
   4. /etc/arcanum/config.jsonc
   5. Built-in defaults
+
+The scan store lives under C<report.output_dir> (default: C<~/.arcanum>).
+Per-path raw scan results are stored there; C<report> and C<remediate>
+read from this store.
 
 =head1 AUTHOR
 
