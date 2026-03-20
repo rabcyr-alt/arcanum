@@ -402,7 +402,11 @@ sub _builtin_defaults {
     return {
         scan => {
             paths               => [],
-            exclude_globs       => [qw(**/node_modules/** **/vendor/** **/.git/**)],
+            exclude_globs       => [qw(
+                **/node_modules/** **/vendor/** **/.git/**
+                **/cpan/** **/local/lib/** **/.cpan/** **/.cpanm/**
+                **/venv/** **/.venv/** **/.arcanum-quarantine/**
+            )],
             follow_symlinks     => 0,
             max_depth           => 0,
             age_thresholds      => { relaxed => 365, normal => 180, aggressive => 90 },
@@ -415,26 +419,70 @@ sub _builtin_defaults {
             names                => [],
             patterns             => [],
             file_globs           => [],
-            attribution_patterns => [],
+            attribution_patterns => [
+                "^\\s*[#*]?\\s*(Author|Maintainer|Copyright|Written by|Contributor)\\s*[:\\-]",
+                "^=head\\d\\s+AUTHOR",
+                '@author\b',
+                "^\\s*\"author\"\\s*:",
+            ],
         },
         default_level => 'normal',
         detectors => {
-            email_address => { enabled => 1, level => 'normal' },
+            email_address        => { enabled => 1, level => 'normal' },
+            phone_number         => { enabled => 1, level => 'normal',
+                                      formats => [qw(E164 NANP UK DE FR AU IN)] },
+            ssn_us               => { enabled => 1, level => 'aggressive' },
+            nin_uk               => { enabled => 0 },
+            sin_canada           => { enabled => 0 },
+            tfn_australia        => { enabled => 0 },
+            credit_card          => { enabled => 1, level => 'aggressive', require_luhn => 1 },
+            iban                 => { enabled => 0 },
+            ip_address           => { enabled => 1, level => 'relaxed', skip_private_ranges => 1 },
+            physical_address     => { enabled => 1, level => 'relaxed' },
+            date_of_birth        => { enabled => 1, level => 'relaxed', require_context => 1 },
+            name                 => { enabled => 1, level => 'normal', strategy => 'namelist',
+                                      min_score => 0.7, plugin => 'ner_spacy' },
+            calendar_event       => { enabled => 1, level => 'normal' },
+            full_email_content   => { enabled => 1, level => 'aggressive' },
+            passport_number      => { enabled => 1, level => 'normal',
+                                      countries => [qw(US UK CA AU DE FR)] },
+            vin                  => { enabled => 0 },
+            medical_id           => { enabled => 0 },
+            mac_address          => { enabled => 1, level => 'relaxed' },
+            national_id_generic  => { enabled => 0 },
+            secrets              => { enabled => 0, level => 'aggressive',
+                                      scan_for => [qw(private_key_pem api_key_generic
+                                          oauth_token jwt_token aws_access_key
+                                          gcp_service_account github_pat slack_token
+                                          db_connection_string)] },
         },
         file_types => {
             presume_unsafe => [qw(ldif ldi bson mongodump)],
-            images         => { scan_exif => 1, scan_filename => 1, ocr_enabled => 0 },
+            images         => {
+                scan_exif              => 1,
+                scan_filename          => 1,
+                ocr_enabled            => 1,
+                ocr_plugin             => 'ocr_tesseract.py',
+                ocr_languages          => ['eng'],
+                ocr_confidence_threshold => 60,
+                ocr_timeout            => 120,
+            },
             archives       => {
                 max_expansion_ratio  => 10,
                 max_extracted_bytes  => 1_073_741_824,
                 min_free_bytes       => 524_288_000,
                 nested_max_depth     => 5,
-                extensions           => [qw(.tar .tgz .zip .gz .bz2 .xz .zst)],
+                extensions           => [qw(
+                    .tar .tgz .tar.gz .tar.bz2 .tar.xz .tar.zst
+                    .zip .gz .bz2 .xz .zst .7z .rar
+                )],
             },
         },
         remediation => {
             dry_run                  => 1,
-            untracked_default_action => 'quarantine',
+            untracked_default_action => 'redact',
+            ignored_default_action   => 'quarantine',
+            external_default_action  => 'quarantine',
             tracked_default_action   => 'redact',
             deletion => {
                 secure_overwrite     => 0,
@@ -443,11 +491,22 @@ sub _builtin_defaults {
             },
             redaction => {
                 strategy => 'mask',
-                masks    => { default => '[REDACTED]' },
+                masks    => {
+                    email_address    => '[REDACTED-EMAIL]',
+                    phone_number     => '[REDACTED-PHONE]',
+                    ssn_us           => '[REDACTED-SSN]',
+                    credit_card      => '[REDACTED-CC]',
+                    name             => '[REDACTED-NAME]',
+                    physical_address => '[REDACTED-ADDRESS]',
+                    date_of_birth    => '[REDACTED-DOB]',
+                    default          => '[REDACTED]',
+                },
                 pseudonym_key_file => undef,
             },
             quarantine_dir     => '.arcanum-quarantine',
             encryption         => { gpg_key_id => undef, keep_encrypted => 1, encrypted_extension => '.gpg' },
+            archives           => { mode => 'quarantine' },
+            image_redaction    => { enabled => 1, fill_color => [255, 105, 180], padding => 2 },
             ignore_file        => '.arcanum-ignore',
             preserve_on_crash  => 0,
             corrupt_file_action => 'plaintext',
