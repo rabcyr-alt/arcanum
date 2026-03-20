@@ -5,7 +5,8 @@ use warnings;
 use utf8;
 
 use parent 'App::Arcanum::Detector::Base';
-use Path::Tiny ();
+use Path::Tiny       ();
+use File::ShareDir   ();
 
 our $VERSION = '0.01';
 
@@ -208,10 +209,15 @@ sub _load_name_lists {
     my ($self) = @_;
     return if $_names_loaded;
 
-    my $module_file = $INC{'App/Arcanum/Detector/Name.pm'} // __FILE__;
-    my $data_dir    = Path::Tiny::path($module_file)
-                        ->parent->parent->parent->parent->parent
-                        ->child('data');
+    my $data_dir = do {
+        my $inst = eval { File::ShareDir::dist_dir('App-Arcanum') };
+        ($inst && -d $inst)
+            ? Path::Tiny::path($inst)->child('data')
+            : do {
+                my $mod = $INC{'App/Arcanum/Detector/Name.pm'} // __FILE__;
+                Path::Tiny::path($mod)->parent->parent->parent->parent->parent->child('share', 'data');
+              };
+    };
 
     _load_list($data_dir->child('firstnames.txt'), \%_firstnames);
     _load_list($data_dir->child('surnames.txt'),   \%_surnames);

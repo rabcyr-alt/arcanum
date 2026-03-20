@@ -1,5 +1,8 @@
 use strict;
 use warnings;
+use File::ShareDir::Install;
+install_share dist => 'share';
+
 use ExtUtils::MakeMaker;
 
 WriteMakefile(
@@ -40,6 +43,7 @@ WriteMakefile(
         'Archive::Tar'           => 0,
         'Archive::Zip'           => 0,
         'Archive::Extract'       => 0,
+        'File::ShareDir'         => '1.00',
     },
     META_MERGE => {
         'meta-spec' => { version => 2 },
@@ -50,3 +54,6 @@ WriteMakefile(
     dist  => { COMPRESS => 'gzip -9f', SUFFIX => 'gz' },
     clean => { FILES => 'App-Arcanum-*' },
 );
+
+package MY;
+use File::ShareDir::Install qw(postamble);

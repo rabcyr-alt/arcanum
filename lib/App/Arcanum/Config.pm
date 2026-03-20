@@ -9,6 +9,7 @@ use Path::Tiny       ();
 use Scalar::Util     qw(looks_like_number);
 use File::Spec       ();
 use Carp             qw(croak);
+use File::ShareDir   ();
 
 our $VERSION = '0.01';
 
@@ -206,15 +207,19 @@ sub _parse_file {
     return $data;
 }
 
-# Load the built-in default config from config/default.jsonc, located relative
-# to this module file.
+sub _share_dir {
+    my $installed = eval { File::ShareDir::dist_dir('App-Arcanum') };
+    return Path::Tiny::path($installed) if $installed && -d $installed;
+    # Dev/test fallback: walk up from this module file
+    my $mod = $INC{'App/Arcanum/Config.pm'} // __FILE__;
+    return Path::Tiny::path($mod)->parent->parent->parent->parent->child('share');
+}
+
+# Load the built-in default config from share/default.jsonc.
 sub _load_default {
     my ($self) = @_;
 
-    # Find config/default.jsonc relative to this module's location
-    my $module_file = $INC{'App/Arcanum/Config.pm'} // __FILE__;
-    my $module_dir  = Path::Tiny::path($module_file)->parent->parent->parent->parent;
-    my $default     = $module_dir->child('config', 'default.jsonc');
+    my $default = _share_dir()->child('default.jsonc');
 
     unless (-f $default) {
         # Fall back to hardcoded minimal defaults if the file isn't installed
@@ -246,9 +251,7 @@ sub _load_profile {
     push @search_dirs, Path::Tiny::path($ENV{HOME}, '.config', 'arcanum', 'profiles');
 
     # 3. Built-in profiles directory
-    my $module_file = $INC{'App/Arcanum/Config.pm'} // __FILE__;
-    my $module_dir  = Path::Tiny::path($module_file)->parent->parent->parent->parent;
-    push @search_dirs, $module_dir->child('config', 'profiles');
+    push @search_dirs, _share_dir()->child('profiles');
 
     for my $dir (@search_dirs) {
         my $profile_path = Path::Tiny::path($dir, "$safe_name.jsonc");

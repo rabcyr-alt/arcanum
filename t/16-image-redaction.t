@@ -9,9 +9,9 @@ use Cpanel::JSON::XS ();
 use App::Arcanum::Remediation::ImageRedactor;
 
 my $python3_ok  = (system('python3 -c "from PIL import Image" 2>/dev/null') == 0);
-my $plugin_path = "$RealBin/../plugins/redact_image.py";
+my $plugin_path = "$RealBin/../share/plugins/redact_image.py";
 my $plugin_ok   = -f $plugin_path && -x $plugin_path;
-plan skip_all => 'python3 + PIL + plugins/redact_image.py required'
+plan skip_all => 'python3 + PIL + share/plugins/redact_image.py required'
     unless $python3_ok && $plugin_ok;
 
 # ── Config helpers ─────────────────────────────────────────────────────────────

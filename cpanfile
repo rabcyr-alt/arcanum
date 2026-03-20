@@ -16,6 +16,13 @@ requires 'Cpanel::JSON::XS', '>= 4.0';
 # File/directory traversal
 requires 'Path::Tiny', '>= 0.100';
 
+# Runtime share-dir lookup for installed config/data/plugins
+requires 'File::ShareDir', '>= 1.00';
+
+on 'configure' => sub {
+    requires 'File::ShareDir::Install', '>= 0.06';
+};
+
 # MIME type detection from file extension (pure Perl fallback)
 requires 'File::MimeInfo', '>= 0.28';
 

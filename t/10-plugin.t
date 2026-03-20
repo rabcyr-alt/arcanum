@@ -423,7 +423,7 @@ PLUGIN
 {
     # Test that ner_spacy.py produces valid exit/output on missing spaCy
     # (exits with code 1 and writes JSON error to stderr)
-    my $plugin_path = "$RealBin/../plugins/ner_spacy.py";
+    my $plugin_path = "$RealBin/../share/plugins/ner_spacy.py";
     SKIP: {
         skip 'ner_spacy.py not executable or python3 not available', 3
             unless -x $plugin_path && qx(python3 --version 2>&1) =~ /Python/;

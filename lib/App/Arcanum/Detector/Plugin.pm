@@ -10,6 +10,8 @@ use IPC::Open2     qw(open2);
 use POSIX          qw(SIGALRM);
 use Cpanel::JSON::XS ();
 use Scalar::Util   qw(looks_like_number);
+use File::ShareDir ();
+use Path::Tiny     ();
 
 our $VERSION = '0.01';
 
@@ -200,9 +202,20 @@ sub find_plugin_executable {
 
     my $home    = $ENV{HOME} // '';
     my @exts    = ('', '.py', '.sh', '.pl', '.rb');
+    my $builtin_plugins = do {
+        my $inst = eval { File::ShareDir::dist_dir('App-Arcanum') };
+        ($inst && -d $inst)
+            ? "$inst/plugins"
+            : do {
+                my $mod = $INC{'App/Arcanum/Detector/Plugin.pm'} // __FILE__;
+                Path::Tiny::path($mod)->parent->parent->parent->parent->parent
+                    ->child('share', 'plugins')->stringify;
+              };
+    };
     my @dirs    = (
         "$config_dir/plugins",
         "$home/.config/arcanum/plugins",
+        $builtin_plugins,
     );
 
     for my $dir (@dirs) {

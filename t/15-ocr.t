@@ -335,7 +335,7 @@ PLUGIN
 # ── Test 8: ocr_tesseract.py contract (no tesseract required) ─────────────────
 
 {
-    my $plugin_path = "$RealBin/../plugins/ocr_tesseract.py";
+    my $plugin_path = "$RealBin/../share/plugins/ocr_tesseract.py";
     SKIP: {
         skip 'ocr_tesseract.py not executable or python3 not available', 3
             unless -x $plugin_path && qx(python3 --version 2>&1) =~ /Python/;
