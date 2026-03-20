@@ -186,7 +186,11 @@
     images: {
       scan_exif: true,
       scan_filename: true,
-      ocr_enabled: false,
+      ocr_enabled: false,                 # OCR is expensive; off by default
+      ocr_plugin: "ocr_tesseract",        # plugin name (must be on PATH or in plugins/)
+      ocr_languages: ["eng"],             # tesseract language pack codes
+      ocr_confidence_threshold: 60,       # discard words with confidence < this (0–100)
+      ocr_timeout: 120,                   # seconds; images can be slow to OCR
     },
 
     archives: {

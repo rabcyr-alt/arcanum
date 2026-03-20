@@ -250,6 +250,11 @@ sub run_scan {
             unless ($special->{special_kind} eq 'image') {
                 # SpecialFiles already ran detectors; skip the normal pipeline
             }
+
+            if ($special->{special_kind} eq 'image'
+                    && $cfg->{file_types}{images}{ocr_enabled}) {
+                push @findings, $self->_run_ocr_detectors($fi, $cfg);
+            }
         }
         else {
             @findings = $self->_scan_file($fi, \@parsers, \@detectors, $cfg);
@@ -992,6 +997,47 @@ sub _glob_to_regex {
         else                                  { $re .= quotemeta($part) }
     }
     return qr/$re/;
+}
+
+# Invoke the OCR plugin detector for a single image file.
+# Returns a (possibly empty) list of Finding hashrefs.
+sub _run_ocr_detectors {
+    my ($self, $fi, $cfg) = @_;
+
+    my $img_cfg     = $cfg->{file_types}{images} // {};
+    my $plugin_name = $img_cfg->{ocr_plugin} // 'ocr_tesseract';
+
+    my $plugin_cfg = {
+        enabled                  => 1,
+        timeout                  => $img_cfg->{ocr_timeout}               // 120,
+        ocr_languages            => $img_cfg->{ocr_languages}            // ['eng'],
+        ocr_confidence_threshold => $img_cfg->{ocr_confidence_threshold} // 60,
+        ocr_timeout              => $img_cfg->{ocr_timeout}               // 120,
+    };
+
+    unless (App::Arcanum::Detector::Plugin->find_plugin_executable(
+                $plugin_name, $self->{config_dir})) {
+        $self->{log}->warn(
+            "ocr_enabled is true but plugin '$plugin_name' not found; skipping OCR"
+        );
+        return ();
+    }
+
+    my $det = App::Arcanum::Detector::Plugin->new(
+        config      => $cfg,
+        logger      => $self->{log},
+        plugin_name => $plugin_name,
+        plugin_cfg  => $plugin_cfg,
+        config_dir  => $self->{config_dir},
+    );
+
+    return try {
+        $det->detect('', file => $fi->{path}, line_offset => 1);
+    }
+    catch {
+        $self->{log}->warn("OCR plugin error for '$fi->{path}': $_");
+        ();
+    };
 }
 
 1;
