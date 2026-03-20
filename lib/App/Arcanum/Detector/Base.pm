@@ -180,6 +180,7 @@ sub make_finding {
         col            => $f{col}            // 0,
         key_context    => $f{key_context}    // undef,
         framework_tags => $f{framework_tags} // [],
+        bbox           => $f{bbox}           // undef,
         allowlisted    => 0,
     };
 

@@ -175,6 +175,7 @@ sub detect {
             line        => $line             || undef,
             key_context => $opts{key_context} // undef,
             framework_tags => $self->_framework_tags($pf->{type} // ''),
+            bbox        => $pf->{bbox}       // undef,
         );
     }
 

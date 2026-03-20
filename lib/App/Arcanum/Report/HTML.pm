@@ -205,7 +205,7 @@ sub _file_block {
   <table class="findings-table">
     <thead><tr>
       <th>Severity</th><th>Type</th><th>Value</th>
-      <th>Location</th><th>Key Context</th><th>Confidence</th><th>Tags</th>
+      <th>Location</th><th>Key Context</th><th>Confidence</th><th>Tags</th><th>BBox</th>
     </tr></thead>
     <tbody>
       $findings_html
@@ -237,6 +237,14 @@ sub _finding_row {
 
     my $ctx = _esc($f->{key_context} // '');
 
+    my $bbox = '';
+    if (defined $f->{bbox} && ref $f->{bbox} eq 'HASH') {
+        my $b = $f->{bbox};
+        $bbox = _esc(sprintf('(%d, %d) %dx%d',
+            $b->{left} // 0, $b->{top} // 0,
+            $b->{width} // 0, $b->{height} // 0));
+    }
+
     my $row_class = $is_allowed ? 'allowlisted' : $sev;
 
     return <<"HTML";
@@ -248,6 +256,7 @@ sub _finding_row {
         <td>$ctx</td>
         <td>$conf</td>
         <td>$tags</td>
+        <td>$bbox</td>
       </tr>
 HTML
 }

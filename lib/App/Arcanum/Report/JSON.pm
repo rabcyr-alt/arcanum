@@ -195,6 +195,7 @@ sub _finding_doc {
         source         => $f->{source}         // undef,
         framework_tags => $f->{framework_tags} // [],
         allowlisted    => $is_allowed          ? \1 : \0,
+        (defined $f->{bbox} ? (bbox => $f->{bbox}) : ()),
     };
 }
 

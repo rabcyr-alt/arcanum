@@ -50,6 +50,7 @@ if ($file ne '' && $seg_text eq '') {
         severity   => 'medium',
         confidence => 0.85,
         framework_tags => ['gdpr'],
+        bbox       => { left => 10, top => 20, width => 150, height => 18 },
     };
 }
 
@@ -187,6 +188,16 @@ sub make_arcanum {
     is($email_f->{value}, 'ocr@example.com',   'email finding value correct');
     ok($email_f->{confidence} > 0,             'confidence > 0');
     ok(defined $email_f->{severity},           'severity set');
+    ok(defined $email_f->{bbox},               'bbox present on OCR finding');
+    is(ref $email_f->{bbox}, 'HASH',           'bbox is a hashref');
+    ok(defined $email_f->{bbox}{left},         'bbox has left');
+    ok(defined $email_f->{bbox}{top},          'bbox has top');
+    ok(defined $email_f->{bbox}{width},        'bbox has width');
+    ok(defined $email_f->{bbox}{height},       'bbox has height');
+    is($email_f->{bbox}{left},   10,           'bbox left value correct');
+    is($email_f->{bbox}{top},    20,           'bbox top value correct');
+    is($email_f->{bbox}{width},  150,          'bbox width value correct');
+    is($email_f->{bbox}{height}, 18,           'bbox height value correct');
 }
 
 # ── Test 4: mock plugin receives correct JSON (file set, segment text = '') ───
