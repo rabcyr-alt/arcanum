@@ -5,6 +5,7 @@
 - Perl **5.20** or later (5.32+ recommended)
 - A POSIX-compatible OS (Linux, macOS, FreeBSD)
 - `git` (optional — required for git-status classification and `redact+git` action)
+- `bzip2` — required for `.bz2` archive scanning and repackaging
 - `cpanm` (recommended for CPAN module installation)
 
 Tested on: Rocky Linux 9, RHEL 9, CentOS Stream 9, Ubuntu 22.04, Debian 12.
@@ -254,6 +255,13 @@ Install `Archive::Zip` and `Archive::Tar`:
 ```bash
 cpanm Archive::Zip Archive::Tar
 ```
+
+### Tests fail on `.bz2` archive tests
+
+Install `bzip2`:
+- Rocky/RHEL: `dnf install bzip2`
+- Ubuntu/Debian: `apt-get install bzip2`
+- macOS: `brew install bzip2` (or use the system-provided one)
 
 ### Wide character warnings in reports
 
