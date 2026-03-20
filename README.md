@@ -123,7 +123,7 @@ unquoted keys). The search order is:
 4. `/etc/arcanum/config.jsonc`
 5. Built-in defaults
 
-The shipped `config/default.jsonc` is a fully commented reference. Copy it to
+The shipped `share/config.jsonc` is a fully commented reference. Copy it to
 one of the locations above and edit as needed.
 
 ### Key configuration sections

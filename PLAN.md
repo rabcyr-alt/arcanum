@@ -89,7 +89,7 @@ arcanum/
     ner_spacy.py                 # Optional: spaCy NER (Python subprocess plugin)
     secrets_gitleaks.sh          # Optional: wrapper around gitleaks binary
   config/
-    default.jsonc                # Fully commented default configuration
+    config.jsonc                # Fully commented default configuration
     profiles/
       gdpr.jsonc                 # GDPR-focused detector/threshold preset
       pci_dss.jsonc              # PCI-DSS preset (credit cards aggressive)
@@ -147,9 +147,9 @@ The primary config file is loaded from the first match of:
 2. `.arcanum.jsonc` in the current directory
 3. `~/.config/arcanum/config.jsonc`
 4. `/etc/arcanum/config.jsonc`
-5. Built-in defaults from `config/default.jsonc`
+5. Built-in defaults from `share/config.jsonc`
 
-### Annotated `default.jsonc`
+### Annotated `config.jsonc`
 
 ```jsonc
 {

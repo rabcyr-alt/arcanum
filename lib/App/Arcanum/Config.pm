@@ -215,11 +215,11 @@ sub _share_dir {
     return Path::Tiny::path($mod)->parent->parent->parent->parent->child('share');
 }
 
-# Load the built-in default config from share/default.jsonc.
+# Load the built-in default config from share/config.jsonc.
 sub _load_default {
     my ($self) = @_;
 
-    my $default = _share_dir()->child('default.jsonc');
+    my $default = _share_dir()->child('config.jsonc');
 
     unless (-f $default) {
         # Fall back to hardcoded minimal defaults if the file isn't installed
@@ -397,7 +397,7 @@ sub _validate {
     return @errors;
 }
 
-# Minimal hardcoded defaults used only when config/default.jsonc cannot be found.
+# Minimal hardcoded defaults used only when share/config.jsonc cannot be found.
 sub _builtin_defaults {
     return {
         scan => {

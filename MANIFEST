@@ -66,9 +66,9 @@ Makefile.PL
 MANIFEST
 MANIFEST.SKIP
 README.md
+share/config.jsonc
 share/data/firstnames.txt
 share/data/surnames.txt
-share/default.jsonc
 share/plugins/ner_spacy.py
 share/plugins/ocr_tesseract.py
 share/plugins/README.md

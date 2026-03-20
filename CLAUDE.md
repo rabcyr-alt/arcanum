@@ -62,7 +62,7 @@ Tests are numbered by subsystem: `00-load`, `01-config`, `02-detector-*`, `03-fo
 
 ## Configuration
 
-Reference config with all options: `config/default.jsonc`. Named profiles in `config/profiles/` (gdpr, pci_dss, hipaa, server, laptop). Config format is JSONC (JSON with comments) parsed via Cpanel::JSON::XS relaxed mode.
+Reference config with all options: `share/config.jsonc`. Named profiles in `config/profiles/` (gdpr, pci_dss, hipaa, server, laptop). Config format is JSONC (JSON with comments) parsed via Cpanel::JSON::XS relaxed mode.
 
 ## Key Conventions
 
