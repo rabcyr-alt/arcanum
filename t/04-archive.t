@@ -13,7 +13,7 @@ use App::Arcanum::Format::PlainText;
 
 my $FIXTURES = "$RealBin/fixtures";
 
-system('bzip2 --version 2>/dev/null 1>/dev/null') == 0
+system('bzip2 --help 2>/dev/null') == 0
     or BAIL_OUT('bzip2 is required but not installed (dnf install bzip2 / apt-get install bzip2)');
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
