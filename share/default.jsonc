@@ -186,8 +186,8 @@
     images: {
       scan_exif: true,
       scan_filename: true,
-      ocr_enabled: false,                 # OCR is expensive; off by default
-      ocr_plugin: "ocr_tesseract",        # plugin name (must be on PATH or in plugins/)
+      ocr_enabled: true,                  # OCR is expensive; off by default
+      ocr_plugin: "ocr_tesseract.py",      # plugin name (must be on PATH or in plugins/)
       ocr_languages: ["eng"],             # tesseract language pack codes
       ocr_confidence_threshold: 60,       # discard words with confidence < this (0–100)
       ocr_timeout: 120,                   # seconds; images can be slow to OCR
@@ -209,7 +209,7 @@
   remediation: {
     dry_run: true, # ALWAYS default to dry-run; require --execute to act
 
-    untracked_default_action: "quarantine",
+    untracked_default_action: "redact",	# NOTE: i changed this from "quarantine" for OCR testing, might want to change it back later, or change other things to "redact" - ASH
 
     # Default action for files inside a git repo but excluded by .gitignore.
     # Defaults to untracked_default_action if not set.
@@ -261,7 +261,7 @@
 
     image_redaction: {
       enabled:    true,
-      fill_color: [0, 0, 0],   # RGB triplet or hex string rrggbb - default black
+      fill_color: [255,105,180],   # RGB triplet or hex string rrggbb - default black
       padding:    2,            # extra pixels around each bbox
     },
 
