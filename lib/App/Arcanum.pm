@@ -370,7 +370,12 @@ sub run_remediate {
         @paths ? $paths[0] : Cwd::cwd();
     };
 
-    my %rem_args = (config => $cfg, logger => $self->{log}, scan_root => $scan_root);
+    my %rem_args = (
+        config     => $cfg,
+        logger     => $self->{log},
+        scan_root  => $scan_root,
+        config_dir => $self->{config_dir},
+    );
 
     my $deleter        = App::Arcanum::Remediation::Deleter->new(%rem_args);
     my $redactor       = App::Arcanum::Remediation::Redactor->new(%rem_args);

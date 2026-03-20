@@ -6,6 +6,9 @@ use utf8;
 
 use parent 'App::Arcanum::Remediation::Base';
 
+use IPC::Open2       qw(open2);
+use Cpanel::JSON::XS ();
+
 our $VERSION = '0.01';
 
 =head1 NAME
@@ -14,19 +17,15 @@ App::Arcanum::Remediation::ImageRedactor - Paint filled rectangles over OCR bbox
 
 =head1 DESCRIPTION
 
-Loads an image, paints opaque filled rectangles over each bounding box that
-carried a PII finding (as produced by the OCR plugin), saves the result in
-place, and writes an audit log entry.
-
-Requires the optional C<Imager> CPAN module.  When C<Imager> is not installed
-the method returns 0 and emits a warning so callers can fall back to quarantine.
+Delegates pixel-painting to C<plugins/redact_image.py> (Pillow) via a JSON
+stdin/stdout IPC subprocess.  Public interface is unchanged for callers.
 
 =cut
 
 sub new {
     my ($class, %args) = @_;
     my $self = $class->SUPER::new(%args);
-    $self->{_imager_ok} = eval { require Imager; 1 } ? 1 : 0;
+    $self->{config_dir} = $args{config_dir} // '.';
     return $self;
 }
 
@@ -36,18 +35,13 @@ sub new {
 
 Paint a filled rectangle over every finding that carries a C<bbox> field.
 
-Returns 1 on success, 0 on any failure (Imager missing, no bbox findings,
+Returns 1 on success, 0 on any failure (plugin missing, no bbox findings,
 dry-run, I/O error).
 
 =cut
 
 sub redact_image {
     my ($self, $path, $findings, $file_info, %opts) = @_;
-
-    unless ($self->{_imager_ok}) {
-        $self->_log_warn("ImageRedactor: Imager not installed; quarantine '$path' instead");
-        return 0;
-    }
 
     my @bbox_findings = grep { defined $_->{bbox} } @{ $findings // [] };
     unless (@bbox_findings) {
@@ -57,34 +51,49 @@ sub redact_image {
 
     return 0 unless $self->check_execute('redact_image', $path);
 
-    my $sha_before = $self->file_sha256($path);
-    my $backup     = $self->backup_file($path);
-
-    my $img = Imager->new;
-    unless ($img->read(file => $path)) {
-        $self->_log_warn("ImageRedactor: cannot read '$path': " . $img->errstr);
+    my $cmd = $self->_resolve_plugin;
+    unless ($cmd) {
+        $self->_log_warn(
+            "ImageRedactor: plugin 'redact_image' not found; quarantine '$path' instead"
+        );
         return 0;
     }
 
-    my $color = $self->_fill_color;
-    my $pad   = $self->{config}{remediation}{image_redaction}{padding} // 2;
+    my $sha_before = $self->file_sha256($path);
+    my $backup     = $self->backup_file($path);
 
-    for my $f (@bbox_findings) {
-        my $b = $f->{bbox};
-        $img->box(
-            color  => $color,
-            xmin   => ($b->{left}   - $pad),
-            ymin   => ($b->{top}    - $pad),
-            xmax   => ($b->{left}  + $b->{width}  + $pad - 1),
-            ymax   => ($b->{top}   + $b->{height} + $pad - 1),
-            filled => 1,
-        );
+    my $cfg = $self->{config}{remediation}{image_redaction} // {};
+    my $pad = $cfg->{padding} // 2;
+
+    my @bboxes = map { $_->{bbox} } @bbox_findings;
+
+    my $JSON    = Cpanel::JSON::XS->new->utf8;
+    my $payload = $JSON->encode({
+        path       => $path,
+        bboxes     => \@bboxes,
+        fill_color => $self->_fill_color_raw,
+        padding    => $pad + 0,
+    });
+
+    my $timeout = $cfg->{timeout} // 30;
+    my $output  = $self->_run_subprocess($cmd, $payload, $timeout);
+
+    unless (defined $output) {
+        rename $backup, $path if defined $backup && -f $backup;
+        return 0;
     }
 
-    unless ($img->write(file => $path)) {
-        # Restore backup on write failure
-        rename $backup, $path if defined $backup;
-        $self->_log_warn("ImageRedactor: write failed for '$path': " . $img->errstr);
+    my $resp = eval { $JSON->decode($output) };
+    if ($@ || !ref $resp) {
+        rename $backup, $path if defined $backup && -f $backup;
+        $self->_log_warn("ImageRedactor: invalid JSON from plugin: $@");
+        return 0;
+    }
+
+    unless ($resp->{ok}) {
+        my $err = $resp->{error} // 'unknown error';
+        rename $backup, $path if defined $backup && -f $backup;
+        $self->_log_warn("ImageRedactor: plugin error for '$path': $err");
         return 0;
     }
 
@@ -102,21 +111,67 @@ sub redact_image {
     return 1;
 }
 
-# Build an Imager::Color from the fill_color config value.
-# Accepts an RGB arrayref [r,g,b] or a hex string "#rrggbb".
-sub _fill_color {
+# Return the raw fill_color config value (arrayref or string) for JSON.
+sub _fill_color_raw {
     my ($self) = @_;
     my $cfg = $self->{config}{remediation}{image_redaction} // {};
-    my $raw = $cfg->{fill_color} // [0, 0, 0];
+    return $cfg->{fill_color} // [0, 0, 0];
+}
 
-    if (ref $raw eq 'ARRAY') {
-        return Imager::Color->new($raw->[0] // 0, $raw->[1] // 0, $raw->[2] // 0);
+# Locate the redact_image plugin executable.
+sub _resolve_plugin {
+    my ($self) = @_;
+    require App::Arcanum::Detector::Plugin;
+    return App::Arcanum::Detector::Plugin->find_plugin_executable(
+        'redact_image', $self->{config_dir}
+    );
+}
+
+# Run a subprocess with JSON input, return stdout string or undef on error.
+sub _run_subprocess {
+    my ($self, $cmd, $input, $timeout) = @_;
+    $timeout //= 30;
+
+    my ($child_out, $child_in);
+    my $pid;
+    my $output;
+
+    eval {
+        local $SIG{ALRM} = sub { die "timeout\n" };
+        alarm($timeout);
+
+        $pid = open2($child_out, $child_in, $cmd)
+            or die "open2 failed: $!\n";
+
+        print $child_in $input;
+        close $child_in;
+
+        local $/;
+        $output = <$child_out>;
+        close $child_out;
+        waitpid($pid, 0);
+        my $exit = $? >> 8;
+
+        alarm(0);
+
+        if ($exit != 0) {
+            die "exit code $exit\n";
+        }
+    };
+
+    alarm(0);   # always cancel alarm
+
+    if ($@) {
+        chomp(my $err = $@);
+        $self->_log_warn("ImageRedactor: subprocess failed: $err");
+        if ($pid) {
+            eval { kill 'TERM', $pid };
+            eval { waitpid($pid, 0) };
+        }
+        return undef;
     }
-    if (!ref $raw && $raw =~ /^#([0-9a-fA-F]{6})$/) {
-        my ($r, $g, $b) = map { hex } ($1 =~ /(..)/g);
-        return Imager::Color->new($r, $g, $b);
-    }
-    return Imager::Color->new(0, 0, 0);   # fallback: black
+
+    return $output;
 }
 
 1;
