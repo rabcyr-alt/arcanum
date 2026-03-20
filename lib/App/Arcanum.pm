@@ -54,6 +54,7 @@ use App::Arcanum::Remediation::Encryptor;
 use App::Arcanum::Remediation::GitRewriter;
 use App::Arcanum::Remediation::Quarantine;
 use App::Arcanum::Remediation::Redactor;
+use App::Arcanum::Remediation::ImageRedactor;
 use App::Arcanum::Report::Text;
 use App::Arcanum::Report::JSON;
 use App::Arcanum::Report::HTML;
@@ -123,8 +124,7 @@ sub new {
         color      => $args{color} // (-t STDOUT ? 1 : 0),
         config_dir => do {
             my $cf = $args{config_file} // '';
-            $cf =~ s{/[^/]+$}{} if $cf;
-            $cf || '.';
+            ($cf && $cf =~ s{/[^/]+$}{}) ? ($cf || '.') : '.';
         },
     };
 
@@ -372,9 +372,10 @@ sub run_remediate {
 
     my %rem_args = (config => $cfg, logger => $self->{log}, scan_root => $scan_root);
 
-    my $deleter    = App::Arcanum::Remediation::Deleter->new(%rem_args);
-    my $redactor   = App::Arcanum::Remediation::Redactor->new(%rem_args);
-    my $quarantine = App::Arcanum::Remediation::Quarantine->new(%rem_args);
+    my $deleter        = App::Arcanum::Remediation::Deleter->new(%rem_args);
+    my $redactor       = App::Arcanum::Remediation::Redactor->new(%rem_args);
+    my $image_redactor = App::Arcanum::Remediation::ImageRedactor->new(%rem_args);
+    my $quarantine     = App::Arcanum::Remediation::Quarantine->new(%rem_args);
     my $encryptor;
 
     my $arc_mode = ($cfg->{remediation}{archives}{mode} // 'quarantine');
@@ -433,13 +434,28 @@ sub run_remediate {
             }
         }
         elsif ($action eq 'redact' || $action eq 'redact+git') {
-            my $ok = $redactor->redact($path, $findings, $fi, reason => 'arcanum scan');
-            push @actions, {
-                file    => $path,
-                action  => $action,
-                dry_run => $redactor->is_dry_run ? 1 : 0,
-                outcome => $redactor->is_dry_run ? 'dry_run' : ($ok ? 'success' : 'failed'),
-            };
+            # Image files: paint bounding boxes rather than text-level redaction
+            if (($fi->{extension_group} // '') eq 'image') {
+                my $ok = $image_redactor->redact_image(
+                    $path, $findings, $fi, reason => 'arcanum scan',
+                );
+                push @actions, {
+                    file    => $path,
+                    action  => $action,
+                    dry_run => $image_redactor->is_dry_run ? 1 : 0,
+                    outcome => $image_redactor->is_dry_run ? 'dry_run'
+                             : ($ok ? 'success' : 'failed'),
+                };
+            }
+            else {
+                my $ok = $redactor->redact($path, $findings, $fi, reason => 'arcanum scan');
+                push @actions, {
+                    file    => $path,
+                    action  => $action,
+                    dry_run => $redactor->is_dry_run ? 1 : 0,
+                    outcome => $redactor->is_dry_run ? 'dry_run' : ($ok ? 'success' : 'failed'),
+                };
+            }
         }
         elsif ($action eq 'quarantine') {
             my %seen;

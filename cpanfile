@@ -111,6 +111,10 @@ requires 'MIME::Base64';
 
 # ── Optional (enhance capability if present) ──────────────────────────────────
 
+# Optional: image pixel redaction (paint over OCR bbox findings)
+# [C] [SYS: libpng-devel libjpeg-devel]
+recommends 'Imager';
+
 # Optional: check quarantined files
 recommends 'File::Scan::ClamAV';
 

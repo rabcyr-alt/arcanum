@@ -259,6 +259,12 @@
         mode: "quarantine",
     },
 
+    image_redaction: {
+      enabled:    true,
+      fill_color: [0, 0, 0],   # RGB triplet or hex string rrggbb - default black
+      padding:    2,            # extra pixels around each bbox
+    },
+
     ignore_file: ".arcanum-ignore",
 
     # Crash recovery: if true, preserve temp dirs on crash for resume

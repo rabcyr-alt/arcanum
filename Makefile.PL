@@ -40,6 +40,8 @@ WriteMakefile(
         'Archive::Tar'           => 0,
         'Archive::Zip'           => 0,
         'Archive::Extract'       => 0,
+        # Optional: image pixel redaction (paint over OCR bbox findings)
+        'Imager'                 => 0,
     },
     META_MERGE => {
         'meta-spec' => { version => 2 },
