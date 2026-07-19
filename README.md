@@ -11,7 +11,7 @@ back-ends are configured and explicitly enabled.
 
 ## WARNING
 
-THIS CODE IS FAR FROM PRODUCTION-READY! DO NOT RUN ON ANY PRODUCTION SYSTEM! Purely AI-generated code. It leaves a mess of temp files (very bad considering its purpose) on scanning, and its remediation actions might not work, or it might ruin things.
+THIS CODE IS FAR FROM PRODUCTION-READY! DO NOT RUN ON ANY PRODUCTION SYSTEM! Designed and directed by me, implemented with Claude Code Sonnet, early alpha status. It leaves a mess of temp files (very bad considering its purpose) on scanning, and its remediation actions might not work, or it might ruin things.
 
 Once I have it working for me, it still may not work properly for every format nor every detector. Every remediator should work, however. Notification may not, or only email.
 
